@@ -9,11 +9,13 @@ A shared order queue for a pizza shop, built with Angular. Everything runs in th
 
 ## How syncing works
 
-Browsers talk to each other directly over WebRTC, using the free [PeerJS](https://peerjs.com) cloud server only to find each other. The browser that created the queue is the host: it keeps the orders (saved in its local storage) and sends every change to everyone else.
+Devices sync through a free public MQTT broker ([HiveMQ](https://www.hivemq.com/mqtt/public-mqtt-broker/)) over a secure WebSocket, so it works on any network, including mobile data. Everything sent is end-to-end encrypted with a key derived from the queue link, so the broker only sees a scrambled topic name and ciphertext.
 
-- Keep the creator's tab open while the shop is running. Reloading it is fine; closing it pauses syncing until it's opened again.
+The browser that created the queue is the host: it keeps the orders (saved in its local storage), applies every change and publishes the latest queue.
+
+- Keep the creator's tab open while the shop is running. If it closes, everyone still sees the last queue, and new orders and changes are delivered when it's back.
 - Other devices reconnect automatically.
-- To use your own PeerJS server, add `?signal=host:port` to the URL before the `#`.
+- To use another broker, add `?broker=wss://host:port/path` to the URL before the `#`.
 
 ## Develop
 

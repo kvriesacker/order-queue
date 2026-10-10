@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { QueueService } from '../queue.service';
 
@@ -16,26 +16,20 @@ import { QueueService } from '../queue.service';
         <a routerLink="counter" routerLinkActive="active">Counter</a>
       </nav>
       <div class="topbar-end">
-        <span class="pill" [class]="queue.connection()" [title]="queue.lastError()">
-          @switch (queue.connection()) {
-            @case ('online') {
-              {{ queue.isHost() ? 'Hosting · ' + queue.guestCount() + ' connected' : 'Connected' }}
-            }
-            @case ('offline') {
-              Offline
-            }
-            @default {
-              Connecting…
-            }
-          }
-        </span>
+        <span class="pill" [class]="pill().kind">{{ pill().text }}</span>
         <button class="btn" type="button" (click)="share()">
           {{ copied() ? 'Link copied' : 'Share link' }}
         </button>
       </div>
     </header>
-    @if (queue.lastError() && queue.connection() !== 'online') {
-      <p class="banner">{{ queue.lastError() }}</p>
+    @if (queue.connection() === 'offline') {
+      <p class="banner">No internet connection. Changes are sent when it’s back.</p>
+    } @else if (
+      queue.connection() === 'online' && !queue.isHost() && queue.hostOnline() === false
+    ) {
+      <p class="banner">
+        The queue’s host is offline, so new orders and changes wait until its tab is open again.
+      </p>
     }
     @if (queue.isHost()) {
       <p class="banner subtle">This tab holds the queue. Keep it open so others stay in sync.</p>
@@ -47,6 +41,19 @@ export class Shell {
   protected queue = inject(QueueService);
   readonly id = input.required<string>();
   protected copied = signal(false);
+
+  protected pill = computed(() => {
+    const q = this.queue;
+    if (q.connection() === 'offline') return { kind: 'offline', text: 'Offline' };
+    if (q.connection() !== 'online') return { kind: 'connecting', text: 'Connecting…' };
+    if (q.isHost()) {
+      const n = q.guestCount();
+      return { kind: 'online', text: `Hosting · ${n} ${n === 1 ? 'device' : 'devices'}` };
+    }
+    return q.hostOnline() === false
+      ? { kind: 'offline', text: 'Host offline' }
+      : { kind: 'online', text: 'Connected' };
+  });
 
   constructor() {
     effect(() => {
