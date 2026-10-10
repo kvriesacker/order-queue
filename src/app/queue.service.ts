@@ -10,6 +10,7 @@ import {
   PizzaStatus,
   Timing,
   normalizeState,
+  pizzasLeft,
   randomId,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
@@ -38,6 +39,8 @@ export class QueueService {
   /** For guests: whether the host's browser is connected (null until known). */
   readonly hostOnline = signal<boolean | null>(null);
   readonly guestCount = signal(0);
+  /** Ids of orders this device sent that were refused because too few pizzas were left. */
+  readonly refused = signal<ReadonlySet<string>>(new Set());
   /** Ticks every 15 seconds so "x min ago" labels stay fresh. */
   readonly now = signal(Date.now());
 
@@ -53,6 +56,16 @@ export class QueueService {
     return this.pending().reduce((s, a) => (a.type === 'add' ? s : applyAction(s, a)), state);
   });
   readonly orders = computed(() => this.state()?.orders ?? []);
+  /** Pizzas that can still be sold, counting this device's unsent orders; null without a limit. */
+  readonly pizzasLeft = computed(() => {
+    const state = this.state();
+    const left = state ? pizzasLeft(state) : null;
+    if (left === null) return null;
+    const unsent = this.pending()
+      .filter((a) => a.type === 'add')
+      .reduce((n, a) => n + a.items.reduce((m, i) => m + i.qty, 0), 0);
+    return Math.max(0, left - unsent);
+  });
   /** Estimated ready time per open order id; refreshes as the clock ticks. */
   readonly estimates = computed(() => {
     const state = this.state();
@@ -92,6 +105,7 @@ export class QueueService {
       menu,
       timing,
       orders: [],
+      soldCleared: 0,
     };
     localStorage.setItem(HOST_KEY(id), JSON.stringify(state));
     return id;
@@ -283,8 +297,17 @@ export class QueueService {
       case this.topic('state'): {
         const state = await crypto.decrypt<QueueState>(payload);
         if (!state || this.isHost() || crypto !== this.crypto) return;
-        this.confirmed.set(normalizeState(state));
-        this.pending.update((p) => p.filter((a) => !isReflected(state, a)));
+        const next = normalizeState(state);
+        this.confirmed.set(next);
+        // An order the host can't accept (too few pizzas left) won't ever arrive; drop it.
+        for (const a of this.pending()) {
+          if (a.type === 'add' && !isReflected(next, a) && applyAction(next, a) === next)
+            this.refuse(a.id);
+        }
+        const refused = this.refused();
+        this.pending.update((p) =>
+          p.filter((a) => !isReflected(next, a) && !(a.type === 'add' && refused.has(a.id))),
+        );
         break;
       }
       case this.topic('actions'): {
@@ -307,7 +330,11 @@ export class QueueService {
     } catch {
       return; // Malformed action.
     }
-    if (next === state) return;
+    if (next === state) {
+      if (action.type === 'add' && !state.orders.some((o) => o.id === action.id))
+        this.refuse(action.id);
+      return;
+    }
     this.confirmed.set(next);
     localStorage.setItem(HOST_KEY(next.id), JSON.stringify(next));
     this.publishState();
@@ -351,6 +378,10 @@ export class QueueService {
       });
       if (!track) this.trackKeys.delete(id);
     }
+  }
+
+  private refuse(orderId: string): void {
+    this.refused.update((s) => new Set(s).add(orderId));
   }
 
   private publishState(): void {

@@ -1097,3 +1097,36 @@ input:focus {
 .track-number {
   margin: 0.3rem 0 0.6rem;
 }
+
+/* Pizzas still available */
+.pill.left {
+  background: #fff3df;
+  color: #8a5a00;
+}
+.pill.left.low {
+  background: #fde2e2;
+  color: var(--tomato-dark);
+}
+.left-note {
+  margin: 0;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.6rem;
+  background: #fff3df;
+  color: #6b4700;
+}
+.left-note.low {
+  background: #fde2e2;
+  color: var(--tomato-dark);
+}
+.sent.refused {
+  background: #fde2e2;
+  color: var(--tomato-dark);
+}
+.max-pizzas {
+  display: block;
+  margin-bottom: 0.8rem;
+}
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

@@ -40,8 +40,13 @@ const SHOW_FOR = 10 * 60000;
         </div>
       } @else {
         <div class="os-idle">
-          <p class="os-welcome">Welcome!</p>
-          <p class="muted">Your order number and a code to follow it appear here.</p>
+          @if (queue.pizzasLeft() === 0) {
+            <p class="os-welcome">Sold out</p>
+            <p class="muted">Sorry, all pizzas are sold. Thanks for coming!</p>
+          } @else {
+            <p class="os-welcome">Welcome!</p>
+            <p class="muted">Your order number and a code to follow it appear here.</p>
+          }
         </div>
       }
       <footer class="os-footer">

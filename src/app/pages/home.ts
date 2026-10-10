@@ -25,7 +25,7 @@ import { TimingEditor } from './timing-editor';
           <span class="hint">Untick what you don’t sell and pick a color for each pizza.</span>
         </div>
         <app-menu-editor [(menu)]="menu" />
-        <strong>Estimated ready times</strong>
+        <strong>Pizzas and ready times</strong>
         <app-timing-editor [(timing)]="timing" />
         @if (createError()) {
           <p class="error">{{ createError() }}</p>

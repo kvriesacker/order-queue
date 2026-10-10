@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NewOrderItem, OTHER_COLOR } from '../models';
 
@@ -19,12 +19,27 @@ import { OrderCard } from './order-card';
             >Customer screen ↗</a
           >
         </div>
+        @if (left() !== null) {
+          <p class="left-note" [class.low]="canAdd() === false || left()! <= 10">
+            @if (overLimit()) {
+              Only <strong>{{ left() }}</strong> {{ left() === 1 ? 'pizza' : 'pizzas' }} left.
+              Remove {{ cart().length - left()! }} from this order to send it.
+            } @else if (left() === 0) {
+              <strong>Sold out.</strong> No more pizzas can be sold.
+            } @else {
+              <strong>{{ left() }}</strong> {{ left() === 1 ? 'pizza' : 'pizzas' }} still available{{
+                cart().length ? ', ' + (left()! - cart().length) + ' after this order' : ''
+              }}.
+            }
+          </p>
+        }
         <div class="menu">
           @for (pizza of menu(); track pizza.name) {
             <button
               class="menu-item"
               type="button"
               [style.border-left-color]="pizza.color"
+              [disabled]="!canAdd()"
               (click)="add(pizza.name, pizza.color)"
             >
               {{ pizza.name }}
@@ -33,7 +48,7 @@ import { OrderCard } from './order-card';
         </div>
         <form class="inline" (ngSubmit)="addCustom()">
           <input name="custom" [(ngModel)]="custom" placeholder="Something else…" maxlength="60" />
-          <button class="btn" type="submit" [disabled]="!custom.trim()">Add</button>
+          <button class="btn" type="submit" [disabled]="!custom.trim() || !canAdd()">Add</button>
         </form>
 
         @if (cart().length) {
@@ -46,6 +61,7 @@ import { OrderCard } from './order-card';
                   <button
                     class="btn ghost small"
                     type="button"
+                    [disabled]="!canAdd()"
                     (click)="duplicate(i)"
                     aria-label="Add another one"
                   >
@@ -102,10 +118,15 @@ import { OrderCard } from './order-card';
             />
           </label>
         </div>
-        <button class="btn primary big" type="button" [disabled]="!cart().length" (click)="send()">
+        <button class="btn primary big" type="button" [disabled]="!cart().length || overLimit()" (click)="send()">
           Send to kitchen
         </button>
-        @if (lastNumber()) {
+        @if (refused()) {
+          <p class="sent refused">
+            Not sent: there weren’t enough pizzas left for this order. Check the order and send it
+            again.
+          </p>
+        } @else if (lastNumber()) {
           <p class="sent">
             Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
             @if (lastEta(); as t) {
@@ -150,6 +171,34 @@ export class Take {
       .slice()
       .reverse(),
   );
+  private lastCart: { cart: NewOrderItem[]; customer: string; note: string } | null = null;
+
+  constructor() {
+    // Put a refused order back so it can be fixed and sent again.
+    effect(() => {
+      if (!this.refused() || !this.lastCart) return;
+      const last = this.lastCart;
+      this.lastCart = null;
+      untracked(() => {
+        this.cart.set(last.cart);
+        this.customer = last.customer;
+        this.note = last.note;
+      });
+    });
+  }
+
+  /** Pizzas that can still be sold, or null without a limit. */
+  protected left = computed(() => this.queue.pizzasLeft());
+  protected canAdd = computed(() => {
+    const left = this.left();
+    return left === null || this.cart().length < left;
+  });
+  protected overLimit = computed(() => {
+    const left = this.left();
+    return left !== null && this.cart().length > left;
+  });
+  /** The order just sent was refused because another order took the last pizzas. */
+  protected refused = computed(() => this.queue.refused().has(this.lastId()));
   protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
   protected clock = clockTime;
   /** The screen facing the customer while ordering, best opened on a second display. */
@@ -199,8 +248,12 @@ export class Take {
   }
 
   send() {
-    const id = this.queue.addOrder(this.customer, this.cart(), this.note);
+    if (this.overLimit()) return;
+    const cart = this.cart();
+    const id = this.queue.addOrder(this.customer, cart, this.note);
     this.lastId.set(id);
+    // Keep the order to try again if it gets refused.
+    this.lastCart = { cart, customer: this.customer, note: this.note };
     this.cart.set([]);
     this.customer = '';
     this.note = '';

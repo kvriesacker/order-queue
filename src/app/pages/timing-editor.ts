@@ -18,6 +18,21 @@ const OVEN_FIELDS: Field[] = [
 @Component({
   selector: 'app-timing-editor',
   template: `
+    <label class="max-pizzas">
+      <span
+        >Pizzas available in total
+        <span class="muted">(how many you can make; 0 = no limit)</span></span
+      >
+      <input
+        type="number"
+        min="0"
+        max="99999"
+        step="1"
+        inputmode="numeric"
+        [value]="timing().maxPizzas"
+        (input)="setMax($any($event.target).valueAsNumber)"
+      />
+    </label>
     <div class="grid3">
       @for (f of fields; track f.key) {
         <label>
@@ -64,6 +79,10 @@ export class TimingEditor {
   readonly timing = model.required<Timing>();
   protected fields = FIELDS;
   protected ovenFields = OVEN_FIELDS;
+
+  setMax(value: number) {
+    if (value >= 0 && Number.isInteger(value)) this.timing.update((t) => ({ ...t, maxPizzas: value }));
+  }
 
   set(key: keyof Timing, value: number, whole = false) {
     if (!(value > 0) || (whole && !Number.isInteger(value))) return;

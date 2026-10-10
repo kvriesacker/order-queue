@@ -1,4 +1,4 @@
-import { QueueAction, QueueState, applyAction, normalizeState } from './models';
+import { QueueAction, QueueState, applyAction, normalizeState, pizzasLeft } from './models';
 
 describe('applyAction', () => {
   const empty: QueueState = {
@@ -6,8 +6,9 @@ describe('applyAction', () => {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4 },
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
     orders: [],
+    soldCleared: 0,
   };
   const add = (id: string): QueueAction & { type: 'add' } => ({
     type: 'add',
@@ -27,6 +28,31 @@ describe('applyAction', () => {
   it('ignores a duplicate add, such as a resent action', () => {
     const once = applyAction(empty, add('a'));
     expect(applyAction(once, add('a'))).toBe(once);
+  });
+
+  it('never sells more pizzas than the limit', () => {
+    const limited = { ...empty, timing: { ...empty.timing, maxPizzas: 5 } };
+    let s = applyAction(applyAction(limited, add('a')), add('b'));
+    expect(pizzasLeft(s)).toBe(1);
+    // 2 more don't fit.
+    expect(applyAction(s, add('c'))).toBe(s);
+    // Cancelling frees the pizzas again, but bringing it back needs room.
+    s = applyAction(s, { type: 'status', id: 'a', status: 'cancelled' });
+    expect(pizzasLeft(s)).toBe(3);
+    s = applyAction(s, add('c'));
+    expect(pizzasLeft(s)).toBe(1);
+    expect(applyAction(s, { type: 'status', id: 'a', status: 'new' })).toBe(s);
+    expect(pizzasLeft(empty)).toBeNull();
+  });
+
+  it('keeps counting pizzas of picked-up orders that were cleared from the list', () => {
+    let s = { ...empty, timing: { ...empty.timing, maxPizzas: 500 } };
+    for (let i = 0; i < 110; i++) {
+      s = applyAction(s, add(`o${i}`), i);
+      s = applyAction(s, { type: 'status', id: `o${i}`, status: 'collected' }, i);
+    }
+    expect(s.orders.length).toBe(100);
+    expect(pizzasLeft(s)).toBe(500 - 220);
   });
 
   it('ignores orders without items', () => {

@@ -48,7 +48,12 @@ import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
         </div>
       </section>
       <footer class="display-footer">
-        <span>{{ queue.state()?.name }}</span>
+        <span
+          >{{ queue.state()?.name }}
+          @if (queue.pizzasLeft() === 0) {
+            <span class="pill left low">Sold out</span>
+          }
+        </span>
         <span class="display-controls">
           @if (queue.connection() !== 'online') {
             <span class="pill offline">Offline</span>

@@ -20,6 +20,11 @@ import { QueueService } from '../queue.service';
         }
       </nav>
       <div class="topbar-end">
+        @if (queue.pizzasLeft(); as left) {
+          <span class="pill left" [class.low]="left <= 10">{{ left }} {{ left === 1 ? 'pizza' : 'pizzas' }} left</span>
+        } @else if (queue.pizzasLeft() === 0) {
+          <span class="pill left low">Sold out</span>
+        }
         <span class="pill" [class]="pill().kind">{{ pill().text }}</span>
         <button class="btn" type="button" (click)="share()">
           {{ copied() ? 'Link copied' : 'Share link' }}

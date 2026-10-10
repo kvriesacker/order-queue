@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { DEFAULT_TIMING, MenuItem, Timing } from '../models';
+import { DEFAULT_TIMING, MenuItem, Timing, pizzasLeft, pizzasSold } from '../models';
 import { QueueService } from '../queue.service';
 import { phaseTimes } from '../estimate';
 import { MenuEditor } from './menu-editor';
@@ -17,7 +17,15 @@ import { TimingEditor } from './timing-editor';
           <h2>Menu</h2>
           <p class="hint">Changes apply to new orders. Orders already placed keep their colors.</p>
           <app-menu-editor [(menu)]="menu" />
-          <h2>Estimated ready times</h2>
+          <h2>Pizzas and ready times</h2>
+          @if (sold(); as s) {
+            <p class="hint">
+              Sold so far: <strong>{{ s.sold }}</strong>
+              @if (s.left !== null) {
+                · still available: <strong>{{ s.left }}</strong>
+              }
+            </p>
+          }
           <app-timing-editor [(timing)]="timing" />
           @if (live(); as l) {
             <p class="hint">
@@ -59,6 +67,11 @@ export class MenuPage {
       counter: min(t.counter),
       slots: state.timing.ovens * state.timing.pizzasPerOven,
     };
+  });
+
+  protected sold = computed(() => {
+    const state = this.queue.state();
+    return state ? { sold: pizzasSold(state), left: pizzasLeft(state) } : null;
   });
 
   constructor() {

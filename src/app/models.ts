@@ -54,6 +54,8 @@ export interface QueueState {
   menu: MenuItem[];
   timing: Timing;
   orders: Order[];
+  /** Pizzas in picked-up orders that were cleared from the list, so they still count as sold. */
+  soldCleared: number;
 }
 
 /** The host's starting guess for each phase; real times take over as orders go through. */
@@ -68,6 +70,8 @@ export interface Timing {
   ovens: number;
   /** How many pizzas fit in one oven at once. */
   pizzasPerOven: number;
+  /** How many pizzas can be made in total (dough, toppings); 0 means no limit. */
+  maxPizzas: number;
 }
 
 export const DEFAULT_TIMING: Timing = {
@@ -76,12 +80,28 @@ export const DEFAULT_TIMING: Timing = {
   counterMinutes: 2,
   ovens: 1,
   pizzasPerOven: 4,
+  maxPizzas: 0,
 };
 /** The phase durations, in minutes. */
 export const TIMING_KEYS = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'] as const;
 /** The oven capacity, as whole numbers. */
 export const OVEN_KEYS = ['ovens', 'pizzasPerOven'] as const;
 const OVEN_MAX = 50;
+const MAX_PIZZAS = 99999;
+
+/** Pizzas sold so far: every order except cancelled ones. */
+export function pizzasSold(state: QueueState): number {
+  const inList = state.orders
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + o.items.reduce((n, i) => n + i.qty, 0), 0);
+  return inList + state.soldCleared;
+}
+
+/** How many pizzas can still be sold, or null when there's no limit. */
+export function pizzasLeft(state: QueueState): number | null {
+  const max = state.timing.maxPizzas;
+  return max > 0 ? Math.max(0, max - pizzasSold(state)) : null;
+}
 
 export type QueueAction =
   | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
@@ -136,6 +156,9 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           };
         });
       if (!items.length) return state;
+      // Never sell more pizzas than can be made.
+      const left = pizzasLeft(state);
+      if (left !== null && items.reduce((n, i) => n + i.qty, 0) > left) return state;
       const order: Order = {
         id: action.id,
         number: state.nextNumber,
@@ -146,16 +169,16 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         createdAt: now,
         updatedAt: now,
       };
-      return {
-        ...state,
-        nextNumber: state.nextNumber + 1,
-        orders: trimFinished([...state.orders, order]),
-      };
+      return trimFinished({ ...state, nextNumber: state.nextNumber + 1 }, [...state.orders, order]);
     }
     case 'status': {
       const target = state.orders.find((o) => o.id === action.id);
       if (!target || target.status === action.status || !(action.status in STATUS_LABELS))
         return state;
+      // Bringing back a cancelled order sells its pizzas again, so it needs room.
+      const left = pizzasLeft(state);
+      const qty = target.items.reduce((n, i) => n + i.qty, 0);
+      if (target.status === 'cancelled' && left !== null && qty > left) return state;
       return updateOrder(state, action.id, (o) => {
         let items = o.items;
         // Moving a whole order back into the kitchen (undo at the counter) or forward
@@ -204,6 +227,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       const timing = { ...state.timing };
       for (const key of TIMING_KEYS) timing[key] = minutes(action.timing[key], timing[key]);
       for (const key of OVEN_KEYS) timing[key] = count(action.timing[key], timing[key]);
+      const max = action.timing.maxPizzas;
+      if (typeof max === 'number' && max >= 0 && max <= MAX_PIZZAS) timing.maxPizzas = Math.floor(max);
       return { ...state, timing };
     }
     case 'menu': {
@@ -260,6 +285,7 @@ export function normalizeState(state: QueueState): QueueState {
     : { ...DEFAULT_TIMING };
   // Queues from before the oven settings get the default oven.
   for (const key of OVEN_KEYS) if (!(timing[key] >= 1)) timing[key] = DEFAULT_TIMING[key];
+  if (!(timing.maxPizzas >= 0)) timing.maxPizzas = 0;
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
     const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);
@@ -278,7 +304,8 @@ export function normalizeState(state: QueueState): QueueState {
     return { ...o, items };
   });
   const { id, name, nextNumber } = state;
-  return { id, name, nextNumber, menu, timing, orders };
+  const soldCleared = state.soldCleared >= 0 ? state.soldCleared : 0;
+  return { id, name, nextNumber, menu, timing, orders, soldCleared };
 }
 
 /** Black or white, whichever reads better on the given background color. */
@@ -289,24 +316,29 @@ export function textOn(color: string): string {
 }
 
 function updateOrder(state: QueueState, id: string, fn: (o: Order) => Order): QueueState {
-  const orders = state.orders.map((o) => (o.id === id ? fn(o) : o));
-  return { ...state, orders: trimFinished(orders) };
+  return trimFinished(state, state.orders.map((o) => (o.id === id ? fn(o) : o)));
 }
 
 function isColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 }
 
-function trimFinished(orders: Order[]): Order[] {
+/** Sets the orders, clearing the oldest finished ones while keeping the sold count right. */
+function trimFinished(state: QueueState, orders: Order[]): QueueState {
   const finished = orders.filter((o) => o.status === 'collected' || o.status === 'cancelled');
-  if (finished.length <= MAX_FINISHED) return orders;
-  const drop = new Set(
-    finished
-      .sort((a, b) => a.updatedAt - b.updatedAt)
-      .slice(0, finished.length - MAX_FINISHED)
-      .map((o) => o.id),
-  );
-  return orders.filter((o) => !drop.has(o.id));
+  if (finished.length <= MAX_FINISHED) return { ...state, orders };
+  const dropped = finished
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+    .slice(0, finished.length - MAX_FINISHED);
+  const ids = new Set(dropped.map((o) => o.id));
+  const sold = dropped
+    .filter((o) => o.status === 'collected')
+    .reduce((sum, o) => sum + o.items.reduce((n, i) => n + i.qty, 0), 0);
+  return {
+    ...state,
+    orders: orders.filter((o) => !ids.has(o.id)),
+    soldCleared: state.soldCleared + sold,
+  };
 }
 
 export function randomId(length = 6): string {
