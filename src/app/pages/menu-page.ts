@@ -22,7 +22,8 @@ import { TimingEditor } from './timing-editor';
           @if (live(); as l) {
             <p class="hint">
               Used right now: prepare {{ l.prepare }} min per pizza, bake {{ l.bake }} min, counter
-              {{ l.counter }} min.
+              {{ l.counter }} min, with room for {{ l.slots }}
+              {{ l.slots === 1 ? 'pizza' : 'pizzas' }} in the oven at once.
             </p>
           }
           <div class="toolbar">
@@ -52,7 +53,12 @@ export class MenuPage {
     if (!state) return null;
     const t = phaseTimes(state, this.queue.now());
     const min = (ms: number) => Math.round((ms / 60000) * 10) / 10;
-    return { prepare: min(t.prepare), bake: min(t.bake), counter: min(t.counter) };
+    return {
+      prepare: min(t.prepare),
+      bake: min(t.bake),
+      counter: min(t.counter),
+      slots: state.timing.ovens * state.timing.pizzasPerOven,
+    };
   });
 
   constructor() {

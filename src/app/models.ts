@@ -64,10 +64,24 @@ export interface Timing {
   bakeMinutes: number;
   /** Minutes from the last pizza baked until the counter calls the order. */
   counterMinutes: number;
+  /** How many ovens bake at the same time. */
+  ovens: number;
+  /** How many pizzas fit in one oven at once. */
+  pizzasPerOven: number;
 }
 
-export const DEFAULT_TIMING: Timing = { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2 };
-export const TIMING_KEYS: (keyof Timing)[] = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'];
+export const DEFAULT_TIMING: Timing = {
+  prepareMinutes: 3,
+  bakeMinutes: 8,
+  counterMinutes: 2,
+  ovens: 1,
+  pizzasPerOven: 4,
+};
+/** The phase durations, in minutes. */
+export const TIMING_KEYS = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'] as const;
+/** The oven capacity, as whole numbers. */
+export const OVEN_KEYS = ['ovens', 'pizzasPerOven'] as const;
+const OVEN_MAX = 50;
 
 export type QueueAction =
   | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
@@ -185,8 +199,11 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
     case 'timing': {
       const minutes = (n: unknown, fallback: number) =>
         typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
+      const count = (n: unknown, fallback: number) =>
+        typeof n === 'number' && n >= 1 && n <= OVEN_MAX ? Math.floor(n) : fallback;
       const timing = { ...state.timing };
       for (const key of TIMING_KEYS) timing[key] = minutes(action.timing[key], timing[key]);
+      for (const key of OVEN_KEYS) timing[key] = count(action.timing[key], timing[key]);
       return { ...state, timing };
     }
     case 'menu': {
@@ -239,8 +256,10 @@ export function normalizeState(state: QueueState): QueueState {
   const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
   // Queues from before the three phases had a different timing shape; start fresh.
   const timing = TIMING_KEYS.every((k) => (state.timing?.[k] ?? 0) > 0)
-    ? state.timing
+    ? { ...state.timing }
     : { ...DEFAULT_TIMING };
+  // Queues from before the oven settings get the default oven.
+  for (const key of OVEN_KEYS) if (!(timing[key] >= 1)) timing[key] = DEFAULT_TIMING[key];
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
     const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);

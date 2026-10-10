@@ -10,7 +10,7 @@ function queue(): QueueState {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2 },
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4 },
     orders: [],
   };
 }
@@ -61,6 +61,29 @@ describe('estimateReady', () => {
     const t = phaseTimes(s, T0 + 50 * MIN);
     expect(t.bake).toBe(5 * MIN);
     expect(t.counter).toBe(1 * MIN);
+  });
+
+  it('waits for room in the ovens and speeds up with more ovens', () => {
+    const base = queue();
+    base.timing = { ...base.timing, prepareMinutes: 1, ovens: 1, pizzasPerOven: 1 };
+    const s = order(base, 'a', 3, T0);
+    // Prepared at 1, 2, 3 but one at a time in the oven: baked at 9, 17, 25, called at 27.
+    expect(estimateReady(s, T0).get('a')).toBe(T0 + 27 * MIN);
+    const more = applyAction(s, { type: 'timing', timing: { ...s.timing, ovens: 3 } });
+    // Three ovens: baked at 9, 10, 11, called at 13.
+    expect(estimateReady(more, T0).get('a')).toBe(T0 + 13 * MIN);
+  });
+
+  it('ignores bake times of pizzas that waited for a full oven', () => {
+    let s = queue();
+    s.timing = { ...s.timing, ovens: 1, pizzasPerOven: 1 };
+    s = order(s, 'a', 2, T0);
+    s = pizza(s, 'a', 0, 'prepared', T0);
+    s = pizza(s, 'a', 1, 'prepared', T0 + MIN); // waits for the first pizza
+    s = pizza(s, 'a', 0, 'baked', T0 + 8 * MIN);
+    s = pizza(s, 'a', 1, 'baked', T0 + 16 * MIN);
+    // Only the first pizza counts (8 min, the same as the setting), not the 15 min wait.
+    expect(phaseTimes(s, T0 + 16 * MIN).bake).toBe(8 * MIN);
   });
 
   it('moves estimates later when an order is running late', () => {

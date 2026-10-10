@@ -108,7 +108,7 @@ const LAST_TIMING_KEY = 'pizza-queue:last-timing';
 function lastTiming(): Timing {
   try {
     const saved = JSON.parse(localStorage.getItem(LAST_TIMING_KEY) ?? 'null');
-    if (TIMING_KEYS.every((k) => saved?.[k] > 0)) return saved;
+    if (TIMING_KEYS.every((k) => saved?.[k] > 0)) return { ...DEFAULT_TIMING, ...saved };
   } catch {
     // Fall back to the default timing.
   }

@@ -2,7 +2,7 @@
 
 A shared order queue for a pizza shop, built with Angular. Everything runs in the browser: there is no backend.
 
-1. **Create a queue**: tick the pizzas you sell, add your own and give each a color, and set starting times for each phase (prepare, bake, counter). Share the link with your team. The host can change these later under **Settings**.
+1. **Create a queue**: tick the pizzas you sell, add your own and give each a color, and set starting times for each phase (prepare, bake, counter) and how many ovens you have. Share the link with your team. The host can change these later under **Settings**.
 2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number.
 3. **Kitchen**: every pizza has its own row in its menu color, with its note. Mark each pizza **Prepared** when it's ready for the oven.
 4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
@@ -13,7 +13,7 @@ A shared order queue for a pizza shop, built with Angular. Everything runs in th
 Every open order shows an estimated ready time on each screen, including the customer screen. The estimate is split into three phases:
 
 - **Prepare**: the kitchen makes pizzas one after another in order of arrival.
-- **Bake**: each prepared pizza spends the bake time in the oven (several fit at once).
+- **Bake**: each prepared pizza goes into the first free oven spot and bakes for the bake time. The host sets how many ovens there are and how many pizzas fit in each; when the ovens are full, pizzas wait their turn.
 - **Counter**: after an order's last pizza is baked, the counter needs a moment to call it.
 
 The host sets a starting time for each phase. As pizzas are marked prepared and baked and orders are called, each phase learns its real pace from the last hour, so a faster kitchen pulls every estimate earlier and a slow oven pushes them later. Settings shows the times in use right now.

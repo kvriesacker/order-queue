@@ -32,9 +32,13 @@ export function phaseTimes(state: QueueState, now: number): PhaseTimes {
     .sort((a, b) => a - b);
   const prepareGaps = prepared.slice(1).map((t, i) => t - prepared[i]);
 
-  // Oven: from prepared to baked, per pizza.
+  // Oven: from prepared to baked, per pizza. A pizza that had to wait for room in a full
+  // oven doesn't tell how long baking takes, so it's left out.
+  const slots = ovenSlots(state);
+  const inOvenAt = (at: number) =>
+    pizzas.filter((t) => t.prepared && t.prepared < at && (!t.baked || t.baked > at)).length;
   const bakeTimes = pizzas
-    .filter((t) => recent(t.baked) && t.prepared)
+    .filter((t) => recent(t.baked) && t.prepared && inOvenAt(t.prepared) < slots)
     .map((t) => t.baked! - t.prepared!);
 
   // Counter: from the order's last pizza baked to the customer being called.
@@ -58,17 +62,21 @@ function blend(samples: number[], setting: number): number {
   return Math.max(MINUTE / 6, measured * weight + setting * (1 - weight));
 }
 
+/** How many pizzas fit in the ovens at once. */
+export function ovenSlots(state: QueueState): number {
+  return Math.max(1, state.timing.ovens * state.timing.pizzasPerOven);
+}
+
 /**
  * Estimates when each open order will be ready for the customer, per order id.
  *
  * The kitchen prepares pizzas one after another in order of arrival. Each prepared pizza
- * then bakes for the bake time (the oven holds several at once). When an order's last
- * pizza is baked, the counter needs its own time to call it. Each phase uses
- * {@link phaseTimes}, and anything running late is pushed to "now", so the estimates
- * keep moving with reality.
+ * then goes into the first oven spot that frees up (the host sets how many ovens and how
+ * many pizzas fit in each) and bakes for the bake time. When an order's last pizza is
+ * baked, the counter needs its own time to call it. Each phase uses {@link phaseTimes},
+ * and anything running late is pushed to "now", so the estimates keep moving with reality.
  */
 export function estimateReady(state: QueueState, now: number): Map<string, number> {
-  const result = new Map<string, number>();
   const { prepare, bake, counter } = phaseTimes(state, now);
 
   // The kitchen started its current pizza when it finished the previous one, unless it
@@ -82,27 +90,39 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
   const open = state.orders
     .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
     .sort((a, b) => a.createdAt - b.createdAt);
+
+  // When each order's pizzas are baked, and which pizzas still need the oven.
+  const lastBaked = new Map<string, number>();
+  const forOven: { order: string; from: number }[] = [];
   for (const order of open) {
-    let lastBaked = order.status === 'ready' ? (order.bakedAt ?? now) : 0;
-    if (order.status !== 'ready') {
-      for (const item of order.items) {
-        item.units.forEach((unit, j) => {
-          const times = item.times[j] ?? {};
-          let baked: number;
-          if (unit === 'baked') {
-            baked = times.baked ?? now;
-          } else if (unit === 'prepared') {
-            baked = Math.max(now, (times.prepared ?? now) + bake);
-          } else {
-            kitchen = Math.max(now, kitchen + prepare);
-            baked = kitchen + bake;
-          }
-          lastBaked = Math.max(lastBaked, baked);
-        });
-      }
+    lastBaked.set(order.id, order.status === 'ready' ? (order.bakedAt ?? now) : 0);
+    if (order.status === 'ready') continue;
+    for (const item of order.items) {
+      item.units.forEach((unit, j) => {
+        const times = item.times[j] ?? {};
+        if (unit === 'baked') {
+          lastBaked.set(order.id, Math.max(lastBaked.get(order.id)!, times.baked ?? now));
+        } else if (unit === 'prepared') {
+          forOven.push({ order: order.id, from: times.prepared ?? now });
+        } else {
+          kitchen = Math.max(now, kitchen + prepare);
+          forOven.push({ order: order.id, from: kitchen });
+        }
+      });
     }
-    result.set(order.id, Math.max(now, lastBaked + counter));
   }
+
+  // Fill the oven spots in the order pizzas come out of the kitchen.
+  const free = Array<number>(ovenSlots(state)).fill(0);
+  for (const pizza of forOven.sort((a, b) => a.from - b.from)) {
+    const spot = free.indexOf(Math.min(...free));
+    const baked = Math.max(now, Math.max(pizza.from, free[spot]) + bake);
+    free[spot] = baked;
+    lastBaked.set(pizza.order, Math.max(lastBaked.get(pizza.order)!, baked));
+  }
+
+  const result = new Map<string, number>();
+  for (const [id, baked] of lastBaked) result.set(id, Math.max(now, baked + counter));
   return result;
 }
 

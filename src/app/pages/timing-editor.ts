@@ -1,10 +1,17 @@
 import { Component, model } from '@angular/core';
 import { Timing } from '../models';
 
-const FIELDS: { key: keyof Timing; label: string; hint: string }[] = [
+type Field = { key: keyof Timing; label: string; hint: string };
+
+const FIELDS: Field[] = [
   { key: 'prepareMinutes', label: 'Prepare', hint: 'minutes per pizza in the kitchen' },
   { key: 'bakeMinutes', label: 'Bake', hint: 'minutes in the oven' },
   { key: 'counterMinutes', label: 'Counter', hint: 'minutes to call the order once baked' },
+];
+
+const OVEN_FIELDS: Field[] = [
+  { key: 'ovens', label: 'Ovens', hint: 'baking at the same time' },
+  { key: 'pizzasPerOven', label: 'Pizzas per oven', hint: 'at once' },
 ];
 
 /** The host's starting guess for how long each phase takes. */
@@ -29,8 +36,26 @@ const FIELDS: { key: keyof Timing; label: string; hint: string }[] = [
         </label>
       }
     </div>
+    <div class="grid3 ovens">
+      @for (f of ovenFields; track f.key) {
+        <label>
+          <span
+            >{{ f.label }} <span class="muted">({{ f.hint }})</span></span
+          >
+          <input
+            type="number"
+            min="1"
+            max="50"
+            step="1"
+            inputmode="numeric"
+            [value]="timing()[f.key]"
+            (input)="set(f.key, $any($event.target).valueAsNumber, true)"
+          />
+        </label>
+      }
+    </div>
     <p class="hint">
-      These are starting estimates. As pizzas get prepared, baked and called, each phase follows the
+      The ovens limit how many pizzas bake at once. The times are starting estimates. As pizzas get prepared, baked and called, each phase follows the
       real times.
     </p>
   `,
@@ -38,9 +63,10 @@ const FIELDS: { key: keyof Timing; label: string; hint: string }[] = [
 export class TimingEditor {
   readonly timing = model.required<Timing>();
   protected fields = FIELDS;
+  protected ovenFields = OVEN_FIELDS;
 
-  set(key: keyof Timing, value: number) {
-    if (!(value > 0)) return;
+  set(key: keyof Timing, value: number, whole = false) {
+    if (!(value > 0) || (whole && !Number.isInteger(value))) return;
     this.timing.update((t) => ({ ...t, [key]: value }));
   }
 }
