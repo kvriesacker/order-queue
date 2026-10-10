@@ -35,17 +35,17 @@ import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
       </section>
       <section class="display-col ready">
         <h2>Ready! Please collect</h2>
-        <div class="numbers">
+        <ol class="prep-list ready-list">
           @for (o of readyOrders(); track o.id) {
-            <span class="called" [class.fresh]="o.number === freshest()"
-              >{{ o.number }}
-              @if (o.customer) {
-                <small>{{ o.customer }}</small>
-              }
-              <small class="called-pizzas">{{ summary(o) }}</small>
-            </span>
+            <li [class.fresh]="o.number === freshest()">
+              <span class="prep-num">{{ o.number }}</span>
+              <span class="prep-who">
+                <strong>{{ o.customer || 'Order ' + o.number }}</strong>
+                <span class="prep-pizzas">{{ summary(o) }}</span>
+              </span>
+            </li>
           }
-        </div>
+        </ol>
       </section>
       <footer class="display-footer">
         <span
