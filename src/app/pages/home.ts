@@ -131,7 +131,10 @@ function hostedQueues(): QueueState[] {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key?.startsWith('pizza-queue:host:')) result.push(JSON.parse(localStorage.getItem(key)!));
+      // Queues this browser hosts or helped with (staff devices keep a copy).
+      if (!key?.startsWith('pizza-queue:host:') && !key?.startsWith('pizza-queue:copy:')) continue;
+      const queue = JSON.parse(localStorage.getItem(key)!) as QueueState;
+      if (!result.some((q) => q.id === queue.id)) result.push(queue);
     }
   } catch {
     // Storage unavailable; nothing to list.

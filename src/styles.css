@@ -233,6 +233,13 @@ input:focus {
   color: var(--tomato-dark);
   font-size: 0.9rem;
 }
+.banner.takeover {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
 .banner.subtle {
   background: #fff1d9;
   color: #8a5a10;

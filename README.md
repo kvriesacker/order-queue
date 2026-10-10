@@ -24,7 +24,8 @@ Devices sync through a free public MQTT broker ([HiveMQ](https://www.hivemq.com/
 
 The browser that created the queue is the host: it keeps the orders (saved in its local storage), applies every change and publishes the latest queue.
 
-- Keep the creator's tab open while the shop is running. If it closes, everyone still sees the last queue, and new orders and changes are delivered when it's back.
+- Keep the creator's tab open while the shop is running. If it closes, everyone still sees the last queue (every staff device keeps a copy), and new orders and changes are delivered when it's back.
+- If the host's device is gone for good, anyone on the Orders, Kitchen, Oven or Counter tabs can press **Become host** in the "host is offline" message. Devices that press it at the same time agree on exactly one new host, so order numbers and the pizza limit stay right. When the old host comes back, it sees the newer queue and joins as a normal device instead of overwriting it.
 - Other devices reconnect automatically.
 - The QR code link only lets someone follow their own order: the host publishes each order's status separately, encrypted with a key derived from the order id, so the queue link is never shared with customers.
 - To use another broker, add `?broker=wss://host:port/path` to the URL before the `#`.

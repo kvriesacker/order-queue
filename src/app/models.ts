@@ -56,6 +56,19 @@ export interface QueueState {
   orders: Order[];
   /** Pizzas in picked-up orders that were cleared from the list, so they still count as sold. */
   soldCleared: number;
+  /** Goes up by one each time another device takes over as host. */
+  hostEpoch: number;
+  /** Identifies the device hosting this epoch (a random id it keeps with its saved queue). */
+  hostId: string;
+}
+
+/**
+ * Whether queue `a` comes from a newer host than `b`: a later takeover wins, and if two
+ * devices took over at the same moment, the one with the smaller id wins.
+ */
+export function outranks(a: QueueState, b: QueueState): boolean {
+  if (a.hostEpoch !== b.hostEpoch) return a.hostEpoch > b.hostEpoch;
+  return !!a.hostId && a.hostId !== b.hostId && (!b.hostId || a.hostId < b.hostId);
 }
 
 /** The host's starting guess for each phase; real times take over as orders go through. */
@@ -305,7 +318,9 @@ export function normalizeState(state: QueueState): QueueState {
   });
   const { id, name, nextNumber } = state;
   const soldCleared = state.soldCleared >= 0 ? state.soldCleared : 0;
-  return { id, name, nextNumber, menu, timing, orders, soldCleared };
+  const hostEpoch = state.hostEpoch >= 0 ? state.hostEpoch : 0;
+  const hostId = typeof state.hostId === 'string' ? state.hostId : '';
+  return { id, name, nextNumber, menu, timing, orders, soldCleared, hostEpoch, hostId };
 }
 
 /** Black or white, whichever reads better on the given background color. */

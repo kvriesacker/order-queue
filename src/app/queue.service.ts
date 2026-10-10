@@ -10,6 +10,7 @@ import {
   PizzaStatus,
   Timing,
   normalizeState,
+  outranks,
   pizzasLeft,
   randomId,
 } from './models';
@@ -20,6 +21,12 @@ import { OrderTrack, TRACK_AFTER_DONE, orderTrack, trackCrypto } from './trackin
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 
 const HOST_KEY = (id: string) => `pizza-queue:host:${id}`;
+/** A staff device's copy of the queue, so it can take over when the host is gone. */
+const COPY_KEY = (id: string) => `pizza-queue:copy:${id}`;
+/** How long a starting host listens for a newer host before publishing anything. */
+const HOST_GATE_MS = 1500;
+/** How long a device that wants to take over waits for competing claims. */
+const CLAIM_MS = 2500;
 const DEFAULT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
 const PRESENCE_MS = 20000;
 
@@ -39,6 +46,8 @@ export class QueueService {
   /** For guests: whether the host's browser is connected (null until known). */
   readonly hostOnline = signal<boolean | null>(null);
   readonly guestCount = signal(0);
+  /** True while this device is trying to take over as host. */
+  readonly takingOver = signal(false);
   /** Ids of orders this device sent that were refused because too few pizzas were left. */
   readonly refused = signal<ReadonlySet<string>>(new Set());
   /** Ticks every 15 seconds so "x min ago" labels stay fresh. */
@@ -83,6 +92,13 @@ export class QueueService {
   /** Encryption is async; these keep incoming and outgoing messages in order. */
   private inbox = Promise.resolve();
   private outbox = Promise.resolve();
+  /** A host only publishes once it's sure no newer host exists (see connectAs). */
+  private hostReady = false;
+  /** Set right after winning a takeover: the newest queue is known, so announce at once. */
+  private justTookOver = false;
+  private gateTimer: ReturnType<typeof setTimeout> | undefined;
+  /** This device's attempt to take over, and the competing claims it heard. */
+  private claim: { epoch: number; id: string; seen: Claim[]; aborted: boolean } | null = null;
 
   /** Per order id: the tracking info last published for customers' phones. */
   private tracked = new Map<string, string>();
@@ -106,6 +122,8 @@ export class QueueService {
       timing,
       orders: [],
       soldCleared: 0,
+      hostEpoch: 0,
+      hostId: randomId(12),
     };
     localStorage.setItem(HOST_KEY(id), JSON.stringify(state));
     return id;
@@ -119,7 +137,8 @@ export class QueueService {
     this.crypto = await QueueCrypto.forQueue(id);
     if (id !== this.queueId) return;
 
-    this.confirmed.set(this.loadHostState(id));
+    // Staff devices keep a copy, so the queue shows (and can be taken over) even offline.
+    this.confirmed.set(this.loadHostState(id) ?? this.loadCopy(id));
     this.connectAs(false);
     if (this.loadHostState(id)) this.claimHost(id);
   }
@@ -138,6 +157,50 @@ export class QueueService {
     const id = randomId(10);
     this.dispatch({ type: 'add', id, customer, items, note });
     return id;
+  }
+
+  /**
+   * Makes this device the host when the host's device is gone. Every device that tries
+   * announces a claim and listens for others; only the strongest claim wins, so exactly
+   * one device hosts and order numbers and the pizza limit stay right. Returns whether
+   * this device became the host.
+   */
+  async takeOver(): Promise<boolean> {
+    const state = this.confirmed();
+    const crypto = this.crypto;
+    const client = this.client;
+    const id = this.queueId;
+    if (!state || !crypto || !client?.connected || this.isHost() || this.claim) return false;
+    if (this.hostOnline() !== false) return false;
+    const claim = { epoch: state.hostEpoch + 1, id: randomId(12), seen: [] as Claim[], aborted: false };
+    this.claim = claim;
+    this.takingOver.set(true);
+    client.publish(this.topic('claim'), await crypto.encrypt({ epoch: claim.epoch, id: claim.id }), {
+      qos: 1,
+    });
+    await new Promise((resolve) => setTimeout(resolve, CLAIM_MS));
+    this.claim = null;
+    this.takingOver.set(false);
+    const beaten = claim.seen.some(
+      (c) => c.epoch > claim.epoch || (c.epoch === claim.epoch && c.id < claim.id),
+    );
+    if (claim.aborted || beaten || id !== this.queueId) return false;
+
+    // Won: host the latest queue, including this device's own unsent changes.
+    let next = this.confirmed() ?? state;
+    for (const action of this.pending()) {
+      const after = applyAction(next, action);
+      if (after === next && action.type === 'add') this.refuse(action.id);
+      next = after;
+    }
+    next = { ...next, hostEpoch: claim.epoch, hostId: claim.id };
+    localStorage.setItem(HOST_KEY(id), JSON.stringify(next));
+    localStorage.removeItem(COPY_KEY(id));
+    this.confirmed.set(next);
+    this.pending.set([]);
+    this.justTookOver = true;
+    this.claimHost(id);
+    return true;
   }
 
   setMenu(menu: MenuItem[]): void {
@@ -181,6 +244,8 @@ export class QueueService {
     this.connection.set('idle');
     this.tracked.clear();
     this.trackKeys.clear();
+    this.claim = null;
+    this.takingOver.set(false);
   }
 
   /**
@@ -188,12 +253,20 @@ export class QueueService {
    * wait as guests, and the next one takes over when the hosting tab closes.
    */
   private claimHost(id: string): void {
-    const become = () => {
-      if (id !== this.queueId) return;
-      const saved = this.loadHostState(id);
-      if (saved) this.confirmed.set(saved);
+    const become = (): boolean => {
+      if (id !== this.queueId) return false;
+      // Another tab may have handed hosting to a newer device in the meantime.
+      let saved = this.loadHostState(id);
+      if (!saved) return false;
+      if (!saved.hostId) {
+        // Saved by a version from before takeovers: give this host an id.
+        saved = { ...saved, hostId: randomId(12) };
+        localStorage.setItem(HOST_KEY(id), JSON.stringify(saved));
+      }
+      this.confirmed.set(saved);
       this.pending.set([]);
       this.connectAs(true);
+      return true;
     };
     if (!navigator.locks) {
       become();
@@ -202,7 +275,7 @@ export class QueueService {
     this.lockAbort = new AbortController();
     navigator.locks
       .request(`pizza-queue-host-${id}`, { signal: this.lockAbort.signal }, () => {
-        become();
+        if (!become()) return;
         return new Promise<void>((resolve) => (this.releaseHostLock = resolve));
       })
       .catch(() => {
@@ -212,14 +285,16 @@ export class QueueService {
 
   // ---- MQTT connection ----
 
-  private topic(name: 'state' | 'actions' | 'host' | 'presence'): string {
+  private topic(name: 'state' | 'actions' | 'host' | 'presence' | 'claim'): string {
     return `${this.crypto!.topic}/${name}`;
   }
 
   private connectAs(host: boolean): void {
     this.disconnect();
     this.isHost.set(host);
+    this.hostReady = false;
     this.connection.set('connecting');
+    const hostId = host ? this.confirmed()!.hostId : '';
     const client = mqtt.connect(brokerUrl(), {
       clientId: `pq-${this.clientId}`,
       clean: true,
@@ -227,25 +302,37 @@ export class QueueService {
       connectTimeout: 10000,
       reconnectPeriod: 2000,
       // Tells guests when the host's browser drops off.
-      will: host ? { topic: this.topic('host'), payload: '0', qos: 1, retain: true } : undefined,
+      will: host
+        ? { topic: this.topic('host'), payload: `0:${hostId}`, qos: 1, retain: true }
+        : undefined,
     });
     this.client = client;
 
     client.on('connect', () => {
       if (client !== this.client) return;
       this.connection.set('online');
-      const topics = host
-        ? [this.topic('actions'), this.topic('presence')]
-        : [this.topic('state'), this.topic('host')];
-      client.subscribe(topics, { qos: 1 });
-      if (host) {
-        client.publish(this.topic('host'), '1', { qos: 1, retain: true });
+      client.subscribe([this.topic('state'), this.topic('host'), this.topic('claim')], { qos: 1 });
+      if (!host) {
+        this.announce();
+        return;
+      }
+      // Before publishing, listen briefly: if another device took over while this one was
+      // away, its newer queue arrives and this device steps down instead of overwriting it.
+      this.hostReady = false;
+      clearTimeout(this.gateTimer);
+      // A device that just won a takeover announces itself straight away, so anyone
+      // claiming a moment later backs off.
+      const gate = this.justTookOver ? 0 : HOST_GATE_MS;
+      this.justTookOver = false;
+      this.gateTimer = setTimeout(() => {
+        if (client !== this.client || !this.isHost()) return;
+        this.hostReady = true;
+        client.subscribe([this.topic('actions'), this.topic('presence')], { qos: 1 });
+        this.announceHost();
         this.publishState();
         this.tracked.clear();
         this.publishTracking();
-      } else {
-        this.announce();
-      }
+      }, gate);
     });
     client.on('message', (topic, payload) => {
       if (client !== this.client) return;
@@ -264,12 +351,14 @@ export class QueueService {
 
   private disconnect(): void {
     clearInterval(this.presenceTimer);
+    clearTimeout(this.gateTimer);
     const client = this.client;
     this.client = null;
     if (!client) return;
     // A host leaving on purpose (switching queue) clears its online flag itself.
-    if (this.isHost() && client.connected) {
-      client.publish(this.topic('host'), '0', { qos: 1, retain: true }, () => client.end());
+    if (this.isHost() && this.hostReady && client.connected) {
+      const payload = `0:${this.confirmed()?.hostId ?? ''}`;
+      client.publish(this.topic('host'), payload, { qos: 1, retain: true }, () => client.end());
     } else {
       client.end(true);
     }
@@ -280,7 +369,18 @@ export class QueueService {
     if (!crypto) return;
     switch (topic) {
       case this.topic('host'): {
-        const online = payload === '1';
+        // "1:<host id>" while a host is connected, "0:<host id>" once it's gone.
+        const [flag, hostId = ''] = payload.split(':');
+        const online = flag === '1';
+        if (this.isHost()) {
+          // Someone else's message (such as an old host's "gone" notice) replaced ours.
+          if (this.hostReady && payload !== `1:${this.confirmed()?.hostId}`) this.announceHost();
+          break;
+        }
+        if (online && this.claim) this.claim.aborted = true;
+        // An old host dropping off after a takeover says nothing about the current host.
+        const current = this.confirmed()?.hostId;
+        if (!online && hostId && current && hostId !== current) break;
         const wasOnline = this.hostOnline() === true;
         this.hostOnline.set(online);
         // The host may have missed actions sent while it was away; send them again.
@@ -296,9 +396,19 @@ export class QueueService {
         break;
       case this.topic('state'): {
         const state = await crypto.decrypt<QueueState>(payload);
-        if (!state || this.isHost() || crypto !== this.crypto) return;
+        if (!state || crypto !== this.crypto) return;
         const next = normalizeState(state);
+        const mine = this.confirmed();
+        if (this.isHost()) {
+          // A newer host took over: step down and follow it.
+          if (mine && outranks(next, mine)) this.stepDown(next);
+          return;
+        }
+        if (this.claim && next.hostEpoch >= this.claim.epoch) this.claim.aborted = true;
+        // Ignore an old host's queue once a newer one is known.
+        if (mine && next.hostEpoch < mine.hostEpoch) return;
         this.confirmed.set(next);
+        this.saveCopy(next);
         // An order the host can't accept (too few pizzas left) won't ever arrive; drop it.
         for (const a of this.pending()) {
           if (a.type === 'add' && !isReflected(next, a) && applyAction(next, a) === next)
@@ -308,6 +418,14 @@ export class QueueService {
         this.pending.update((p) =>
           p.filter((a) => !isReflected(next, a) && !(a.type === 'add' && refused.has(a.id))),
         );
+        break;
+      }
+      case this.topic('claim'): {
+        const claim = await crypto.decrypt<Claim>(payload);
+        if (!claim || crypto !== this.crypto) return;
+        this.claim?.seen.push(claim);
+        // The host is still here: say so, which makes the claiming device back off.
+        if (this.isHost() && this.hostReady) this.announceHost();
         break;
       }
       case this.topic('actions'): {
@@ -348,7 +466,7 @@ export class QueueService {
   private publishTracking(): void {
     const state = this.confirmed();
     const client = this.client;
-    if (!state || !client?.connected || !this.isHost()) return;
+    if (!state || !client?.connected || !this.isHost() || !this.hostReady) return;
     const now = Date.now();
     const etas = estimateReady(state, now);
     const followed = state.orders.filter(
@@ -380,6 +498,40 @@ export class QueueService {
     }
   }
 
+  private announceHost(): void {
+    const hostId = this.confirmed()?.hostId ?? '';
+    this.client?.publish(this.topic('host'), `1:${hostId}`, { qos: 1, retain: true });
+  }
+
+  /** Another device hosts now: keep this queue only as a copy and join as staff. */
+  private stepDown(newer: QueueState): void {
+    const id = this.queueId;
+    this.isHost.set(false);
+    localStorage.removeItem(HOST_KEY(id));
+    this.saveCopy(newer);
+    this.confirmed.set(newer);
+    this.connectAs(false);
+    this.releaseHostLock?.();
+    this.releaseHostLock = null;
+  }
+
+  private saveCopy(state: QueueState): void {
+    try {
+      localStorage.setItem(COPY_KEY(state.id), JSON.stringify(state));
+    } catch {
+      // Storage full or blocked; the copy is only a fallback.
+    }
+  }
+
+  private loadCopy(id: string): QueueState | null {
+    try {
+      const raw = localStorage.getItem(COPY_KEY(id));
+      return raw ? normalizeState(JSON.parse(raw) as QueueState) : null;
+    } catch {
+      return null;
+    }
+  }
+
   private refuse(orderId: string): void {
     this.refused.update((s) => new Set(s).add(orderId));
   }
@@ -388,7 +540,7 @@ export class QueueService {
     this.outbox = this.outbox.then(async () => {
       const state = this.confirmed();
       const crypto = this.crypto;
-      if (!state || !crypto || !this.isHost()) return;
+      if (!state || !crypto || !this.isHost() || !this.hostReady) return;
       const payload = await crypto.encrypt(state);
       // Retained, so anyone who opens the link gets the latest queue straight away.
       this.client?.publish(this.topic('state'), payload, { qos: 1, retain: true });
@@ -423,6 +575,11 @@ export class QueueService {
       return null;
     }
   }
+}
+
+interface Claim {
+  epoch: number;
+  id: string;
 }
 
 function isReflected(state: QueueState, action: QueueAction): boolean {

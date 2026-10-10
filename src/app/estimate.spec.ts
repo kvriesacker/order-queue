@@ -13,6 +13,8 @@ function queue(): QueueState {
     timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
     orders: [],
     soldCleared: 0,
+    hostEpoch: 0,
+    hostId: '',
   };
 }
 

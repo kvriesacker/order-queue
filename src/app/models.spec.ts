@@ -1,4 +1,4 @@
-import { QueueAction, QueueState, applyAction, normalizeState, pizzasLeft } from './models';
+import { QueueAction, QueueState, applyAction, normalizeState, outranks, pizzasLeft } from './models';
 
 describe('applyAction', () => {
   const empty: QueueState = {
@@ -9,6 +9,8 @@ describe('applyAction', () => {
     timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
     orders: [],
     soldCleared: 0,
+    hostEpoch: 0,
+    hostId: '',
   };
   const add = (id: string): QueueAction & { type: 'add' } => ({
     type: 'add',
@@ -53,6 +55,19 @@ describe('applyAction', () => {
     }
     expect(s.orders.length).toBe(100);
     expect(pizzasLeft(s)).toBe(500 - 220);
+  });
+
+  it('ranks a takeover above the old host, and settles a tie by id', () => {
+    const old = { ...empty, hostEpoch: 0, hostId: 'mmm' };
+    const next = { ...empty, hostEpoch: 1, hostId: 'zzz' };
+    expect(outranks(next, old)).toBe(true);
+    expect(outranks(old, next)).toBe(false);
+    const a = { ...next, hostId: 'aaa' };
+    expect(outranks(a, next)).toBe(true);
+    expect(outranks(next, a)).toBe(false);
+    expect(outranks(next, next)).toBe(false);
+    // A queue saved before takeovers existed never beats a known host.
+    expect(outranks({ ...old, hostId: '' }, old)).toBe(false);
   });
 
   it('ignores orders without items', () => {

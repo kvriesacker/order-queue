@@ -36,9 +36,19 @@ import { QueueService } from '../queue.service';
     } @else if (
       queue.connection() === 'online' && !queue.isHost() && queue.hostOnline() === false
     ) {
-      <p class="banner">
-        The queue’s host is offline, so new orders and changes wait until its tab is open again.
-      </p>
+      <div class="banner takeover">
+        @if (queue.takingOver()) {
+          <span>Taking over as host…</span>
+        } @else {
+          <span
+            >The queue’s host is offline. New orders and changes wait until its tab is open again,
+            or until this device takes over.</span
+          >
+          @if (queue.state()) {
+            <button class="btn primary small" type="button" (click)="takeOver()">Become host</button>
+          }
+        }
+      </div>
     }
     @if (queue.isHost()) {
       <p class="banner subtle">This tab holds the queue. Keep it open so others stay in sync.</p>
@@ -50,6 +60,15 @@ export class Shell {
   protected queue = inject(QueueService);
   readonly id = input.required<string>();
   protected copied = signal(false);
+
+  async takeOver() {
+    const ok = confirm(
+      'Only do this if the host’s device is really gone. This device then holds the queue: keep this tab open.',
+    );
+    if (ok && !(await this.queue.takeOver())) {
+      alert('The host came back or another device took over first. Nothing changed here.');
+    }
+  }
 
   protected pill = computed(() => {
     const q = this.queue;
