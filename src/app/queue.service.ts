@@ -83,7 +83,6 @@ export class QueueService {
       nextNumber: 1,
       menu,
       timing,
-      bakeLog: [],
       orders: [],
     };
     localStorage.setItem(HOST_KEY(id), JSON.stringify(state));

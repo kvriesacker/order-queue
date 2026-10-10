@@ -20,6 +20,13 @@ export interface OrderItem {
   color: string;
   /** One entry per pizza (qty of them), so the kitchen can bake them one by one. */
   units: PizzaStatus[];
+  /** When each pizza was prepared and baked, to learn how long each phase takes. */
+  times: PizzaTimes[];
+}
+
+export interface PizzaTimes {
+  prepared?: number;
+  baked?: number;
 }
 
 /** An order line as the order taker sends it, before the kitchen tracks its pizzas. */
@@ -34,6 +41,10 @@ export interface Order {
   status: OrderStatus;
   createdAt: number;
   updatedAt: number;
+  /** When the last pizza came out of the oven. */
+  bakedAt?: number;
+  /** When the counter called the order for the customer. */
+  calledAt?: number;
 }
 
 export interface QueueState {
@@ -42,23 +53,21 @@ export interface QueueState {
   nextNumber: number;
   menu: MenuItem[];
   timing: Timing;
-  /** When recent pizzas were baked, newest last, to measure the real baking pace. */
-  bakeLog: number[];
   orders: Order[];
 }
 
-/** The host's starting guess for estimated ready times. */
+/** The host's starting guess for each phase; real times take over as orders go through. */
 export interface Timing {
-  /** Minutes from ordering until the first pizza of an order can be baked. */
-  firstMinutes: number;
-  /** Minutes between two pizzas coming out of the oven. */
-  perPizzaMinutes: number;
+  /** Minutes the kitchen needs to prepare one pizza (one after another). */
+  prepareMinutes: number;
+  /** Minutes a prepared pizza spends in the oven. */
+  bakeMinutes: number;
+  /** Minutes from the last pizza baked until the counter calls the order. */
+  counterMinutes: number;
 }
 
-export const DEFAULT_TIMING: Timing = { firstMinutes: 15, perPizzaMinutes: 4 };
-
-/** How many bake times to keep for measuring the pace. */
-const BAKE_LOG_SIZE = 12;
+export const DEFAULT_TIMING: Timing = { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2 };
+export const TIMING_KEYS: (keyof Timing)[] = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'];
 
 export type QueueAction =
   | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
@@ -109,6 +118,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
             note: i.note.trim().slice(0, 120),
             color: isColor(i.color) ? i.color : OTHER_COLOR,
             units: Array<PizzaStatus>(qty).fill('new'),
+            times: Array.from({ length: qty }, () => ({})),
           };
         });
       if (!items.length) return state;
@@ -137,8 +147,16 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         // Moving a whole order back into the kitchen (undo at the counter) or forward
         // past it keeps its pizzas consistent with the order.
         const unit = UNIT_FOR_ORDER_STATUS[action.status];
-        if (unit) items = o.items.map((i) => ({ ...i, units: i.units.map(() => unit) }));
-        return { ...o, items, status: action.status, updatedAt: now };
+        if (unit) {
+          items = o.items.map((i) => ({
+            ...i,
+            units: i.units.map(() => unit),
+            times: unit === 'new' ? i.times.map(() => ({})) : i.times,
+          }));
+        }
+        const bakedAt = action.status === 'ready' ? (o.bakedAt ?? now) : o.bakedAt;
+        const calledAt = action.status === 'ready-for-customer' ? now : o.calledAt;
+        return { ...o, items, status: action.status, bakedAt, calledAt, updatedAt: now };
       });
     }
     case 'pizza': {
@@ -147,27 +165,29 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       if (!target || !current || current === action.status) return state;
       if (!['new', 'in-progress', 'ready'].includes(target.status)) return state;
       if (!PIZZA_STATUSES.includes(action.status)) return state;
-      const next = updateOrder(state, action.id, (o) => {
+      return updateOrder(state, action.id, (o) => {
         const items = o.items.map((item, i) =>
           i !== action.item
             ? item
-            : { ...item, units: item.units.map((u, j) => (j === action.unit ? action.status : u)) },
+            : {
+                ...item,
+                units: item.units.map((u, j) => (j === action.unit ? action.status : u)),
+                times: item.times.map((t, j) =>
+                  j === action.unit ? stampTimes(t, action.status, now) : t,
+                ),
+              },
         );
-        return { ...o, items, status: kitchenStatus(items), updatedAt: now };
+        const status = kitchenStatus(items);
+        const bakedAt = status === 'ready' ? now : undefined;
+        return { ...o, items, status, bakedAt, updatedAt: now };
       });
-      if (action.status !== 'baked') return next;
-      return { ...next, bakeLog: [...next.bakeLog, now].slice(-BAKE_LOG_SIZE) };
     }
     case 'timing': {
       const minutes = (n: unknown, fallback: number) =>
         typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
-      return {
-        ...state,
-        timing: {
-          firstMinutes: minutes(action.timing.firstMinutes, state.timing.firstMinutes),
-          perPizzaMinutes: minutes(action.timing.perPizzaMinutes, state.timing.perPizzaMinutes),
-        },
-      };
+      const timing = { ...state.timing };
+      for (const key of TIMING_KEYS) timing[key] = minutes(action.timing[key], timing[key]);
+      return { ...state, timing };
     }
     case 'menu': {
       const menu = action.menu
@@ -191,6 +211,13 @@ export function kitchenStatus(items: OrderItem[]): OrderStatus {
   return 'in-progress';
 }
 
+/** Records when a pizza reached a step; going back clears the later steps. */
+function stampTimes(times: PizzaTimes, status: PizzaStatus, now: number): PizzaTimes {
+  if (status === 'new') return {};
+  if (status === 'prepared') return { prepared: times.prepared ?? now };
+  return { prepared: times.prepared, baked: now };
+}
+
 /** What every pizza becomes when a whole order is moved back (an undo at the counter). */
 const UNIT_FOR_ORDER_STATUS: Partial<Record<OrderStatus, PizzaStatus>> = {
   new: 'new',
@@ -210,12 +237,16 @@ const LEGACY_UNITS: Record<string, PizzaStatus> = {
 /** Upgrades a queue saved by an older version of the app (no menu, no per-pizza tracking). */
 export function normalizeState(state: QueueState): QueueState {
   const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
-  const timing = state.timing ?? { ...DEFAULT_TIMING };
-  const bakeLog = Array.isArray(state.bakeLog) ? state.bakeLog : [];
+  // Queues from before the three phases had a different timing shape; start fresh.
+  const timing = TIMING_KEYS.every((k) => (state.timing?.[k] ?? 0) > 0)
+    ? state.timing
+    : { ...DEFAULT_TIMING };
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
     const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);
-    if (o.items.every((i) => Array.isArray(i.units) && i.units.every(current) && i.color)) return o;
+    const upToDate = (i: OrderItem) =>
+      Array.isArray(i.units) && i.units.every(current) && i.color && Array.isArray(i.times);
+    if (o.items.every(upToDate)) return o;
     const unit = UNIT_FOR_ORDER_STATUS[o.status] ?? 'baked';
     const items = o.items.map((i) => ({
       ...i,
@@ -223,10 +254,12 @@ export function normalizeState(state: QueueState): QueueState {
       units: Array.isArray(i.units)
         ? i.units.map((u) => LEGACY_UNITS[u] ?? 'new')
         : Array<PizzaStatus>(i.qty).fill(unit),
+      times: Array.isArray(i.times) ? i.times : Array.from({ length: i.qty }, () => ({})),
     }));
     return { ...o, items };
   });
-  return { ...state, menu, timing, bakeLog, orders };
+  const { id, name, nextNumber } = state;
+  return { id, name, nextNumber, menu, timing, orders };
 }
 
 /** Black or white, whichever reads better on the given background color. */

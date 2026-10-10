@@ -1,9 +1,12 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { clockTime } from '../estimate';
+import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
 
-/** Customer-facing screen: big numbers of orders ready for pickup. */
+/**
+ * Customer-facing screen: each order being made with the customer's name, its pizzas and
+ * estimated time, and big numbers for orders ready to collect.
+ */
 @Component({
   selector: 'app-display',
   imports: [RouterLink],
@@ -11,22 +14,35 @@ import { clockTime } from '../estimate';
     <main class="display" (dblclick)="fullscreen()">
       <section class="display-col preparing">
         <h2>Preparing</h2>
-        <div class="numbers">
+        <ol class="prep-list">
           @for (p of preparing(); track p.number) {
-            <span class="prep"
-              >{{ p.number }}
+            <li>
+              <span class="prep-num">{{ p.number }}</span>
+              <span class="prep-who">
+                <strong>{{ p.name || 'Order ' + p.number }}</strong>
+                <span class="prep-pizzas">{{ p.pizzas }}</span>
+              </span>
               @if (p.eta) {
-                <small>≈ {{ clock(p.eta) }}</small>
+                <span class="prep-eta"
+                  >{{ clock(p.eta) }}<small>{{ until(p.eta) }}</small></span
+                >
               }
-            </span>
+            </li>
+          } @empty {
+            <li class="prep-empty">No orders waiting.</li>
           }
-        </div>
+        </ol>
       </section>
       <section class="display-col ready">
         <h2>Ready! Please collect</h2>
         <div class="numbers">
-          @for (n of ready(); track n) {
-            <span [class.fresh]="n === freshest()">{{ n }}</span>
+          @for (o of readyOrders(); track o.id) {
+            <span class="called" [class.fresh]="o.number === freshest()"
+              >{{ o.number }}
+              @if (o.customer) {
+                <small>{{ o.customer }}</small>
+              }
+            </span>
           }
         </div>
       </section>
@@ -51,8 +67,9 @@ export class Display {
   readonly id = input.required<string>();
   protected sound = signal(true);
   protected clock = clockTime;
+  protected until = (t: number) => minutesUntil(t, this.queue.now());
 
-  private readyOrders = computed(() =>
+  protected readyOrders = computed(() =>
     this.queue
       .orders()
       .filter((o) => o.status === 'ready-for-customer')
@@ -64,7 +81,12 @@ export class Display {
     this.queue
       .orders()
       .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
-      .map((o) => ({ number: o.number, eta: this.queue.estimates().get(o.id) })),
+      .map((o) => ({
+        number: o.number,
+        name: o.customer,
+        pizzas: pizzaSummary(o),
+        eta: this.queue.estimates().get(o.id),
+      })),
   );
 
   private seen = new Set<number>();

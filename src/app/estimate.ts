@@ -1,57 +1,116 @@
-import { Order, QueueState } from './models';
+import { Order, QueueState, Timing } from './models';
 
 const MINUTE = 60000;
+/** Only the last hour counts when measuring how fast things go. */
+const RECENT = 60 * MINUTE;
+/** With this many measurements the real time fully replaces the host's setting. */
+const FULL_TRUST = 5;
+
+export interface PhaseTimes {
+  /** Milliseconds per pizza in the kitchen (pizzas are prepared one after another). */
+  prepare: number;
+  /** Milliseconds a pizza spends in the oven. */
+  bake: number;
+  /** Milliseconds from the last pizza baked until the counter calls the order. */
+  counter: number;
+}
 
 /**
- * Estimates when each open order will be ready, as a timestamp per order id.
+ * How long each phase takes right now: the host's settings at first, then more and more
+ * the times measured over the last hour, so a faster or slower kitchen, oven or counter
+ * moves the estimates by itself.
+ */
+export function phaseTimes(state: QueueState, now: number): PhaseTimes {
+  const setting = (key: keyof Timing) => state.timing[key] * MINUTE;
+  const recent = (t: number | undefined): t is number => !!t && now - t < RECENT;
+  const pizzas = state.orders.flatMap((o) => o.items.flatMap((i) => i.times));
+
+  // Kitchen: the gaps between pizzas being marked prepared, leaving out idle pauses.
+  const prepared = pizzas
+    .map((t) => t.prepared)
+    .filter(recent)
+    .sort((a, b) => a - b);
+  const prepareGaps = prepared.slice(1).map((t, i) => t - prepared[i]);
+
+  // Oven: from prepared to baked, per pizza.
+  const bakeTimes = pizzas
+    .filter((t) => recent(t.baked) && t.prepared)
+    .map((t) => t.baked! - t.prepared!);
+
+  // Counter: from the order's last pizza baked to the customer being called.
+  const counterTimes = state.orders
+    .filter((o) => recent(o.calledAt) && o.bakedAt)
+    .map((o) => o.calledAt! - o.bakedAt!);
+
+  return {
+    prepare: blend(prepareGaps, setting('prepareMinutes')),
+    bake: blend(bakeTimes, setting('bakeMinutes')),
+    counter: blend(counterTimes, setting('counterMinutes')),
+  };
+}
+
+/** Mixes measurements into the setting, ignoring outliers (pauses, forgotten taps). */
+function blend(samples: number[], setting: number): number {
+  const usable = samples.filter((s) => s >= 0 && s < setting * 4).slice(-12);
+  if (!usable.length) return setting;
+  const measured = usable.reduce((a, b) => a + b, 0) / usable.length;
+  const weight = Math.min(1, usable.length / FULL_TRUST);
+  return Math.max(MINUTE / 6, measured * weight + setting * (1 - weight));
+}
+
+/**
+ * Estimates when each open order will be ready for the customer, per order id.
  *
- * Pizzas come out of the oven one after another in order of arrival. The pace starts at
- * the host's "minutes between pizzas" and switches to the measured pace once a few
- * pizzas have been baked recently. A new order also can't be ready before the host's
- * "minutes for the first pizza" have passed since it was placed. Because the clock and
- * the pace move, the estimates update by themselves as the shift goes on.
+ * The kitchen prepares pizzas one after another in order of arrival. Each prepared pizza
+ * then bakes for the bake time (the oven holds several at once). When an order's last
+ * pizza is baked, the counter needs its own time to call it. Each phase uses
+ * {@link phaseTimes}, and anything running late is pushed to "now", so the estimates
+ * keep moving with reality.
  */
 export function estimateReady(state: QueueState, now: number): Map<string, number> {
   const result = new Map<string, number>();
-  const pace = currentPace(state, now);
-  const first = state.timing.firstMinutes * MINUTE;
-  const lastBake = state.bakeLog.at(-1);
+  const { prepare, bake, counter } = phaseTimes(state, now);
 
-  // When the next pizza can come out of the oven.
-  let next = now;
-  if (lastBake && now - lastBake < pace * 2) next = Math.max(now, lastBake + pace);
+  // The kitchen started its current pizza when it finished the previous one, unless it
+  // has been idle for longer than a pizza takes.
+  const lastPrepared = Math.max(
+    0,
+    ...state.orders.flatMap((o) => o.items.flatMap((i) => i.times.map((t) => t.prepared ?? 0))),
+  );
+  let kitchen = now - lastPrepared < prepare ? lastPrepared : now;
 
   const open = state.orders
-    .filter((o) => o.status === 'new' || o.status === 'in-progress')
+    .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
     .sort((a, b) => a.createdAt - b.createdAt);
   for (const order of open) {
-    const left = remainingPizzas(order);
-    if (!left) continue;
-    let t = Math.max(next, order.createdAt + first);
-    t += (left - 1) * pace;
-    result.set(order.id, t);
-    next = t + pace;
+    let lastBaked = order.status === 'ready' ? (order.bakedAt ?? now) : 0;
+    if (order.status !== 'ready') {
+      for (const item of order.items) {
+        item.units.forEach((unit, j) => {
+          const times = item.times[j] ?? {};
+          let baked: number;
+          if (unit === 'baked') {
+            baked = times.baked ?? now;
+          } else if (unit === 'prepared') {
+            baked = Math.max(now, (times.prepared ?? now) + bake);
+          } else {
+            kitchen = Math.max(now, kitchen + prepare);
+            baked = kitchen + bake;
+          }
+          lastBaked = Math.max(lastBaked, baked);
+        });
+      }
+    }
+    result.set(order.id, Math.max(now, lastBaked + counter));
   }
   return result;
 }
 
-/** Milliseconds between pizzas: measured from recent bakes, or the host's setting. */
-export function currentPace(state: QueueState, now: number): number {
-  const configured = state.timing.perPizzaMinutes * MINUTE;
-  const recent = state.bakeLog.filter((t) => now - t < 60 * MINUTE);
-  if (recent.length < 3) return configured;
-  const gaps = recent.slice(1).map((t, i) => t - recent[i]);
-  // Ignore long pauses (no orders) so they don't make the pace look slow.
-  const busy = gaps.filter((g) => g < configured * 3);
-  if (busy.length < 2) return configured;
-  const measured = busy.reduce((a, b) => a + b, 0) / busy.length;
-  // Blend with the setting so one fast or slow pizza doesn't swing everything.
-  const weight = Math.min(1, busy.length / 6);
-  return Math.max(MINUTE / 4, measured * weight + configured * (1 - weight));
-}
-
-function remainingPizzas(order: Order): number {
-  return order.items.reduce((n, i) => n + i.units.filter((u) => u !== 'baked').length, 0);
+/** "2× Margherita, 1× Funghi" for an order, without per-pizza notes. */
+export function pizzaSummary(order: Order): string {
+  const counts = new Map<string, number>();
+  for (const item of order.items) counts.set(item.name, (counts.get(item.name) ?? 0) + item.qty);
+  return [...counts].map(([name, n]) => `${n}× ${name}`).join(', ');
 }
 
 /** "18:42" for a timestamp. */
@@ -59,7 +118,7 @@ export function clockTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-/** "about 12 min" until a timestamp, or "any minute" when it's (nearly) due. */
+/** "12 min" until a timestamp, or "any minute" when it's (nearly) due. */
 export function minutesUntil(ts: number, now: number): string {
   const minutes = Math.round((ts - now) / MINUTE);
   return minutes <= 1 ? 'any minute' : `${minutes} min`;

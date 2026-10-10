@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { MenuItem, Timing } from '../models';
+import { DEFAULT_TIMING, MenuItem, Timing } from '../models';
 import { QueueService } from '../queue.service';
-import { currentPace } from '../estimate';
+import { phaseTimes } from '../estimate';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
 
@@ -19,7 +19,12 @@ import { TimingEditor } from './timing-editor';
           <app-menu-editor [(menu)]="menu" />
           <h2>Estimated ready times</h2>
           <app-timing-editor [(timing)]="timing" />
-          <p class="hint">Current pace: one pizza every {{ pace() }} min.</p>
+          @if (live(); as l) {
+            <p class="hint">
+              Used right now: prepare {{ l.prepare }} min per pizza, bake {{ l.bake }} min, counter
+              {{ l.counter }} min.
+            </p>
+          }
           <div class="toolbar">
             <button class="btn primary" type="button" (click)="save()" [disabled]="!dirty()">
               Save settings
@@ -38,12 +43,16 @@ import { TimingEditor } from './timing-editor';
 export class MenuPage {
   protected queue = inject(QueueService);
   protected menu = signal<MenuItem[]>([]);
-  protected timing = signal<Timing>({ firstMinutes: 0, perPizzaMinutes: 0 });
+  protected timing = signal<Timing>({ ...DEFAULT_TIMING });
   protected saved = signal(false);
   protected dirty = signal(false);
-  protected pace = computed(() => {
+  /** The phase times the estimates use right now, in minutes. */
+  protected live = computed(() => {
     const state = this.queue.state();
-    return state ? Math.round((currentPace(state, this.queue.now()) / 60000) * 10) / 10 : 0;
+    if (!state) return null;
+    const t = phaseTimes(state, this.queue.now());
+    const min = (ms: number) => Math.round((ms / 60000) * 10) / 10;
+    return { prepare: min(t.prepare), bake: min(t.bake), counter: min(t.counter) };
   });
 
   constructor() {

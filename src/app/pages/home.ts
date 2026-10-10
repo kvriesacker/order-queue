@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, Timing } from '../models';
+import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing } from '../models';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
 
@@ -108,7 +108,7 @@ const LAST_TIMING_KEY = 'pizza-queue:last-timing';
 function lastTiming(): Timing {
   try {
     const saved = JSON.parse(localStorage.getItem(LAST_TIMING_KEY) ?? 'null');
-    if (saved?.firstMinutes > 0 && saved?.perPizzaMinutes > 0) return saved;
+    if (TIMING_KEYS.every((k) => saved?.[k] > 0)) return saved;
   } catch {
     // Fall back to the default timing.
   }

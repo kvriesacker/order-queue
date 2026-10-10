@@ -2,15 +2,21 @@
 
 A shared order queue for a pizza shop, built with Angular. Everything runs in the browser: there is no backend.
 
-1. **Create a queue**: tick the pizzas you sell, add your own and give each a color, and set a starting estimate (minutes until the first pizza, minutes between pizzas). Share the link with your team. The host can change these later under **Settings**.
+1. **Create a queue**: tick the pizzas you sell, add your own and give each a color, and set starting times for each phase (prepare, bake, counter). Share the link with your team. The host can change these later under **Settings**.
 2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number.
 3. **Kitchen**: every pizza has its own row in its menu color, with its note. Mark each pizza **Prepared** when it's ready for the oven.
 4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
-5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected (with a chime) and the ones still being prepared. Mark an order "Picked up" to clear it from the screen.
+5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected (with a chime) and, for every order still being made, the customer's name, the pizzas (types and counts, without notes) and the estimated ready time. Mark an order "Picked up" to clear it from the screen.
 
 ## Estimated ready times
 
-Every open order shows an estimated ready time on each screen, including the customer screen. Pizzas are assumed to come out of the oven one after another in order of arrival: the first one after the host's "minutes until the first pizza", then one every "minutes between pizzas". Once the oven has marked a few pizzas baked, the estimate follows the real pace instead, and it moves later automatically when the kitchen falls behind.
+Every open order shows an estimated ready time on each screen, including the customer screen. The estimate is split into three phases:
+
+- **Prepare**: the kitchen makes pizzas one after another in order of arrival.
+- **Bake**: each prepared pizza spends the bake time in the oven (several fit at once).
+- **Counter**: after an order's last pizza is baked, the counter needs a moment to call it.
+
+The host sets a starting time for each phase. As pizzas are marked prepared and baked and orders are called, each phase learns its real pace from the last hour, so a faster kitchen pulls every estimate earlier and a slow oven pushes them later. Settings shows the times in use right now.
 
 ## How syncing works
 

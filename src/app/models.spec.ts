@@ -6,8 +6,7 @@ describe('applyAction', () => {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { firstMinutes: 15, perPizzaMinutes: 4 },
-    bakeLog: [],
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2 },
     orders: [],
   };
   const add = (id: string): QueueAction & { type: 'add' } => ({

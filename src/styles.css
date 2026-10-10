@@ -788,14 +788,94 @@ input:focus {
 .order header.eta-row:has(app-eta:empty) {
   display: none;
 }
-.preparing .numbers .prep {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.05;
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  align-items: end;
 }
-.preparing .numbers .prep small {
-  font-size: 0.35em;
+@media (max-width: 560px) {
+  .grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Customer screen: orders being made */
+.display {
+  grid-template-columns: 1.2fr 1fr;
+}
+.prep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.prep-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: rgb(255 255 255 / 6%);
+  border-radius: 12px;
+}
+.prep-num {
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
+  font-weight: 800;
+  min-width: 2.5ch;
+  color: #fff;
+}
+.prep-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.prep-who strong {
+  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prep-pizzas {
+  font-size: clamp(0.9rem, 1.4vw, 1.2rem);
+  color: #b9a79a;
+}
+.prep-eta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: clamp(1.3rem, 2.5vw, 2.2rem);
+  font-weight: 800;
+  color: var(--crust);
+}
+.prep-eta small {
+  font-size: 0.5em;
   font-weight: 600;
   color: #b9a79a;
+}
+.prep-empty {
+  color: #8a7a6f;
+}
+.ready .numbers .called {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ready .numbers .called small {
+  font-size: 0.22em;
+  font-weight: 700;
+  color: #d9c8bb;
+  margin-top: 0.3rem;
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .display {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
