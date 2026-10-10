@@ -687,12 +687,6 @@ input:focus {
   border-radius: 10px;
   background: #fffaf3;
 }
-.pizzas li.in-progress {
-  background: #fde3e7;
-}
-.pizzas li.ready {
-  background: #dff3e5;
-}
 .chip {
   font-weight: 800;
   padding: 0.35rem 0.7rem;
@@ -763,4 +757,16 @@ input:focus {
   background: var(--ink);
   border-color: var(--ink);
   color: #fff;
+}
+.pizzas li.todo {
+  background: #fffaf3;
+}
+.pizzas li.done-row {
+  background: #dff3e5;
+}
+.pizzas li.other {
+  opacity: 0.55;
+}
+.roles {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }

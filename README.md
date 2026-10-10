@@ -3,9 +3,10 @@
 A shared order queue for a pizza shop, built with Angular. Everything runs in the browser: there is no backend.
 
 1. **Create a queue**: tick the pizzas you sell, add your own and give each a color. Share the link with your team. The host can change the menu later under **Menu**.
-2. **Orders**: tap pizzas, add notes and send the order to the kitchen. The customer gets an order number.
-3. **Kitchen**: every pizza has its own row in its menu color. Put pizzas in the oven and mark them ready one by one; the order goes to the counter once all its pizzas are ready.
-4. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected (with a chime) and the ones still being prepared. Mark an order "Picked up" to clear it from the screen.
+2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number.
+3. **Kitchen**: every pizza has its own row in its menu color, with its note. Mark each pizza **Prepared** when it's ready for the oven.
+4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
+5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected (with a chime) and the ones still being prepared. Mark an order "Picked up" to clear it from the screen.
 
 ## How syncing works
 

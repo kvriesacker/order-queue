@@ -1,8 +1,10 @@
 export type OrderStatus =
   'new' | 'in-progress' | 'ready' | 'ready-for-customer' | 'collected' | 'cancelled';
 
-/** Where one pizza is in the kitchen. */
-export type PizzaStatus = 'new' | 'in-progress' | 'ready';
+/** Where one pizza is: waiting for the kitchen, prepared (waiting for the oven) or baked. */
+export type PizzaStatus = 'new' | 'prepared' | 'baked';
+
+const PIZZA_STATUSES: PizzaStatus[] = ['new', 'prepared', 'baked'];
 
 export interface MenuItem {
   name: string;
@@ -50,7 +52,7 @@ export type QueueAction =
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
-  'in-progress': 'In the oven',
+  'in-progress': 'Being made',
   ready: 'Baked',
   'ready-for-customer': 'Ready for customer',
   collected: 'Picked up',
@@ -117,14 +119,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         let items = o.items;
         // Moving a whole order back into the kitchen (undo at the counter) or forward
         // past it keeps its pizzas consistent with the order.
-        if (
-          action.status === 'new' ||
-          action.status === 'in-progress' ||
-          action.status === 'ready'
-        ) {
-          const unit: PizzaStatus = action.status;
-          items = o.items.map((i) => ({ ...i, units: i.units.map(() => unit) }));
-        }
+        const unit = UNIT_FOR_ORDER_STATUS[action.status];
+        if (unit) items = o.items.map((i) => ({ ...i, units: i.units.map(() => unit) }));
         return { ...o, items, status: action.status, updatedAt: now };
       });
     }
@@ -133,7 +129,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       const current = target?.items[action.item]?.units[action.unit];
       if (!target || !current || current === action.status) return state;
       if (!['new', 'in-progress', 'ready'].includes(target.status)) return state;
-      if (!['new', 'in-progress', 'ready'].includes(action.status)) return state;
+      if (!PIZZA_STATUSES.includes(action.status)) return state;
       return updateOrder(state, action.id, (o) => {
         const items = o.items.map((item, i) =>
           i !== action.item
@@ -157,26 +153,44 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
   }
 }
 
-/** An order's kitchen status follows its pizzas: ready once every pizza is ready. */
-export function kitchenStatus(items: OrderItem[]): PizzaStatus {
+/** An order's status follows its pizzas: ready for the counter once every pizza is baked. */
+export function kitchenStatus(items: OrderItem[]): OrderStatus {
   const units = items.flatMap((i) => i.units);
-  if (units.every((u) => u === 'ready')) return 'ready';
+  if (units.every((u) => u === 'baked')) return 'ready';
   if (units.every((u) => u === 'new')) return 'new';
   return 'in-progress';
 }
+
+/** What every pizza becomes when a whole order is moved back (an undo at the counter). */
+const UNIT_FOR_ORDER_STATUS: Partial<Record<OrderStatus, PizzaStatus>> = {
+  new: 'new',
+  'in-progress': 'prepared',
+  ready: 'baked',
+};
+
+/** Pizza steps saved by older versions: "in the oven" counts as prepared, "ready" as baked. */
+const LEGACY_UNITS: Record<string, PizzaStatus> = {
+  new: 'new',
+  'in-progress': 'prepared',
+  ready: 'baked',
+  prepared: 'prepared',
+  baked: 'baked',
+};
 
 /** Upgrades a queue saved by an older version of the app (no menu, no per-pizza tracking). */
 export function normalizeState(state: QueueState): QueueState {
   const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
-    if (o.items.every((i) => Array.isArray(i.units) && i.color)) return o;
-    const unit: PizzaStatus =
-      o.status === 'new' ? 'new' : o.status === 'in-progress' ? 'in-progress' : 'ready';
+    const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);
+    if (o.items.every((i) => Array.isArray(i.units) && i.units.every(current) && i.color)) return o;
+    const unit = UNIT_FOR_ORDER_STATUS[o.status] ?? 'baked';
     const items = o.items.map((i) => ({
       ...i,
       color: i.color ?? colorOf(i.name),
-      units: Array.isArray(i.units) ? i.units : Array<PizzaStatus>(i.qty).fill(unit),
+      units: Array.isArray(i.units)
+        ? i.units.map((u) => LEGACY_UNITS[u] ?? 'new')
+        : Array<PizzaStatus>(i.qty).fill(unit),
     }));
     return { ...o, items };
   });

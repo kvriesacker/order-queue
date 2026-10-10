@@ -64,7 +64,7 @@ import { OrderCard } from './order-card';
           @for (order of making(); track order.id) {
             <div class="mini">
               <strong>#{{ order.number }}</strong>
-              <span class="muted">{{ order.status === 'new' ? 'Waiting' : 'In the oven' }}</span>
+              <span class="muted">{{ order.status === 'new' ? 'Waiting' : 'Being made' }}</span>
             </div>
           } @empty {
             <p class="muted">None.</p>

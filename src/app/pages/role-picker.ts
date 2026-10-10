@@ -16,7 +16,12 @@ import { RouterLink } from '@angular/router';
         <a class="card role" routerLink="kitchen">
           <span class="role-icon" aria-hidden="true">👨‍🍳</span>
           <strong>Kitchen</strong>
-          <span class="muted">See new orders, put them in the oven and mark them baked.</span>
+          <span class="muted">Make the pizzas and mark each one prepared.</span>
+        </a>
+        <a class="card role" routerLink="oven">
+          <span class="role-icon" aria-hidden="true">🔥</span>
+          <strong>Oven</strong>
+          <span class="muted">Bake the prepared pizzas and mark each one baked.</span>
         </a>
         <a class="card role" routerLink="counter">
           <span class="role-icon" aria-hidden="true">📣</span>

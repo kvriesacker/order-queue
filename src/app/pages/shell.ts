@@ -13,6 +13,7 @@ import { QueueService } from '../queue.service';
       <nav class="tabs">
         <a routerLink="take" routerLinkActive="active">Orders</a>
         <a routerLink="kitchen" routerLinkActive="active">Kitchen</a>
+        <a routerLink="oven" routerLinkActive="active">Oven</a>
         <a routerLink="counter" routerLinkActive="active">Counter</a>
         @if (queue.isHost()) {
           <a routerLink="menu" routerLinkActive="active">Menu</a>
