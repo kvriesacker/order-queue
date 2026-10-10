@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NewOrderItem, OTHER_COLOR } from '../models';
+
+const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
 import { OrderCard } from './order-card';
 
@@ -29,44 +31,54 @@ import { OrderCard } from './order-card';
         </form>
 
         @if (cart().length) {
-          <ul class="cart">
-            @for (line of cart(); track $index) {
-              <li>
-                <div class="qty-ctl">
+          <ol class="cart">
+            @for (line of cart(); track $index; let i = $index) {
+              <li [style.border-left-color]="line.color">
+                <div class="line-head">
+                  <span class="line-num">{{ i + 1 }}</span>
+                  <span class="line-name">{{ line.name }}</span>
                   <button
-                    class="btn icon"
+                    class="btn ghost small"
                     type="button"
-                    (click)="bump($index, -1)"
-                    aria-label="One less"
+                    (click)="duplicate(i)"
+                    aria-label="Add another one"
                   >
-                    −
+                    + same
                   </button>
-                  <span class="qty">{{ line.qty }}</span>
                   <button
-                    class="btn icon"
+                    class="btn ghost small"
                     type="button"
-                    (click)="bump($index, 1)"
-                    aria-label="One more"
+                    (click)="remove(i)"
+                    aria-label="Remove this pizza"
                   >
-                    +
+                    ✕
                   </button>
                 </div>
-                <span class="line-name"
-                  ><span class="dot" [style.background]="line.color"></span>{{ line.name }}</span
-                >
+                <div class="quick-notes">
+                  @for (q of quickNotes; track q) {
+                    <button
+                      class="note-chip"
+                      type="button"
+                      [class.on]="hasNote(line.note, q)"
+                      (click)="toggleNote(i, q)"
+                    >
+                      {{ q }}
+                    </button>
+                  }
+                </div>
                 <input
                   class="line-note"
                   [ngModel]="line.note"
-                  (ngModelChange)="setNote($index, $event)"
+                  (ngModelChange)="setNote(i, $event)"
                   [ngModelOptions]="{ standalone: true }"
-                  placeholder="Extra cheese, no onion…"
+                  placeholder="Note for this pizza…"
                   maxlength="120"
                 />
               </li>
             }
-          </ul>
+          </ol>
         } @else {
-          <p class="muted">Tap a pizza to add it to the order.</p>
+          <p class="muted">Tap a pizza to add it. Each pizza gets its own line and note.</p>
         }
 
         <div class="grid2">
@@ -115,6 +127,7 @@ export class Take {
   protected queue = inject(QueueService);
   protected menu = computed(() => (this.queue.state()?.menu ?? []).filter((m) => m.enabled));
   protected cart = signal<NewOrderItem[]>([]);
+  protected quickNotes = QUICK_NOTES;
   protected custom = '';
   protected customer = '';
   protected note = '';
@@ -132,12 +145,9 @@ export class Take {
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
   );
 
+  /** Every pizza is its own line, so each one can have its own note. */
   add(name: string, color: string) {
-    this.cart.update((cart) => {
-      const i = cart.findIndex((l) => l.name === name && !l.note);
-      if (i >= 0) return cart.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
-      return [...cart, { name, qty: 1, note: '', color }];
-    });
+    this.cart.update((cart) => [...cart, { name, qty: 1, note: '', color }]);
   }
 
   addCustom() {
@@ -146,14 +156,32 @@ export class Take {
     this.custom = '';
   }
 
-  bump(index: number, delta: number) {
-    this.cart.update((cart) =>
-      cart.map((l, i) => (i === index ? { ...l, qty: l.qty + delta } : l)).filter((l) => l.qty > 0),
-    );
+  duplicate(index: number) {
+    this.cart.update((cart) => [
+      ...cart.slice(0, index + 1),
+      { ...cart[index], note: '' },
+      ...cart.slice(index + 1),
+    ]);
+  }
+
+  remove(index: number) {
+    this.cart.update((cart) => cart.filter((_, i) => i !== index));
   }
 
   setNote(index: number, note: string) {
     this.cart.update((cart) => cart.map((l, i) => (i === index ? { ...l, note } : l)));
+  }
+
+  hasNote(note: string, quick: string): boolean {
+    return splitNote(note).some((n) => n.toLowerCase() === quick.toLowerCase());
+  }
+
+  toggleNote(index: number, quick: string) {
+    const parts = splitNote(this.cart()[index].note);
+    const next = this.hasNote(this.cart()[index].note, quick)
+      ? parts.filter((n) => n.toLowerCase() !== quick.toLowerCase())
+      : [...parts, quick];
+    this.setNote(index, next.join(', '));
   }
 
   send() {
@@ -169,4 +197,11 @@ export class Take {
     if (order && confirm(`Cancel order #${order.number}?`))
       this.queue.setStatus(order, 'cancelled');
   }
+}
+
+function splitNote(note: string): string[] {
+  return note
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
 }
