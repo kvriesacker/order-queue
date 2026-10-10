@@ -8,10 +8,12 @@ import {
   QueueState,
   applyAction,
   PizzaStatus,
+  Timing,
   normalizeState,
   randomId,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
+import { estimateReady } from './estimate';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 
@@ -50,6 +52,11 @@ export class QueueService {
     return this.pending().reduce((s, a) => (a.type === 'add' ? s : applyAction(s, a)), state);
   });
   readonly orders = computed(() => this.state()?.orders ?? []);
+  /** Estimated ready time per open order id; refreshes as the clock ticks. */
+  readonly estimates = computed(() => {
+    const state = this.state();
+    return state ? estimateReady(state, this.now()) : new Map<string, number>();
+  });
 
   private queueId = '';
   private crypto: QueueCrypto | null = null;
@@ -68,13 +75,15 @@ export class QueueService {
   }
 
   /** Creates a new queue hosted by this browser and returns its id. */
-  create(name: string, menu: MenuItem[]): string {
+  create(name: string, menu: MenuItem[], timing: Timing): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
       name: name.trim() || 'Pizza queue',
       nextNumber: 1,
       menu,
+      timing,
+      bakeLog: [],
       orders: [],
     };
     localStorage.setItem(HOST_KEY(id), JSON.stringify(state));
@@ -112,6 +121,10 @@ export class QueueService {
 
   setMenu(menu: MenuItem[]): void {
     if (this.isHost()) this.applyAsHost({ type: 'menu', menu });
+  }
+
+  setTiming(timing: Timing): void {
+    if (this.isHost()) this.applyAsHost({ type: 'timing', timing });
   }
 
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
@@ -262,8 +275,9 @@ export class QueueService {
       }
       case this.topic('actions'): {
         const action = await crypto.decrypt<QueueAction>(payload);
-        // Only the host itself may change the menu.
-        if (action && action.type !== 'menu' && this.isHost() && crypto === this.crypto)
+        // Only the host itself may change the menu and timing.
+        const hostOnly = action?.type === 'menu' || action?.type === 'timing';
+        if (action && !hostOnly && this.isHost() && crypto === this.crypto)
           this.applyAsHost(action);
         break;
       }
@@ -327,7 +341,7 @@ export class QueueService {
 }
 
 function isReflected(state: QueueState, action: QueueAction): boolean {
-  if (action.type === 'menu') return true;
+  if (action.type === 'menu' || action.type === 'timing') return true;
   const order = state.orders.find((o) => o.id === action.id);
   if (action.type === 'add') return !!order;
   if (action.type === 'pizza') {

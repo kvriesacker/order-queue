@@ -41,14 +41,31 @@ export interface QueueState {
   name: string;
   nextNumber: number;
   menu: MenuItem[];
+  timing: Timing;
+  /** When recent pizzas were baked, newest last, to measure the real baking pace. */
+  bakeLog: number[];
   orders: Order[];
 }
+
+/** The host's starting guess for estimated ready times. */
+export interface Timing {
+  /** Minutes from ordering until the first pizza of an order can be baked. */
+  firstMinutes: number;
+  /** Minutes between two pizzas coming out of the oven. */
+  perPizzaMinutes: number;
+}
+
+export const DEFAULT_TIMING: Timing = { firstMinutes: 15, perPizzaMinutes: 4 };
+
+/** How many bake times to keep for measuring the pace. */
+const BAKE_LOG_SIZE = 12;
 
 export type QueueAction =
   | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
   | { type: 'status'; id: string; status: OrderStatus }
   | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
-  | { type: 'menu'; menu: MenuItem[] };
+  | { type: 'menu'; menu: MenuItem[] }
+  | { type: 'timing'; timing: Timing };
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
@@ -130,7 +147,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       if (!target || !current || current === action.status) return state;
       if (!['new', 'in-progress', 'ready'].includes(target.status)) return state;
       if (!PIZZA_STATUSES.includes(action.status)) return state;
-      return updateOrder(state, action.id, (o) => {
+      const next = updateOrder(state, action.id, (o) => {
         const items = o.items.map((item, i) =>
           i !== action.item
             ? item
@@ -138,6 +155,19 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         );
         return { ...o, items, status: kitchenStatus(items), updatedAt: now };
       });
+      if (action.status !== 'baked') return next;
+      return { ...next, bakeLog: [...next.bakeLog, now].slice(-BAKE_LOG_SIZE) };
+    }
+    case 'timing': {
+      const minutes = (n: unknown, fallback: number) =>
+        typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
+      return {
+        ...state,
+        timing: {
+          firstMinutes: minutes(action.timing.firstMinutes, state.timing.firstMinutes),
+          perPizzaMinutes: minutes(action.timing.perPizzaMinutes, state.timing.perPizzaMinutes),
+        },
+      };
     }
     case 'menu': {
       const menu = action.menu
@@ -180,6 +210,8 @@ const LEGACY_UNITS: Record<string, PizzaStatus> = {
 /** Upgrades a queue saved by an older version of the app (no menu, no per-pizza tracking). */
 export function normalizeState(state: QueueState): QueueState {
   const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
+  const timing = state.timing ?? { ...DEFAULT_TIMING };
+  const bakeLog = Array.isArray(state.bakeLog) ? state.bakeLog : [];
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
     const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);
@@ -194,7 +226,7 @@ export function normalizeState(state: QueueState): QueueState {
     }));
     return { ...o, items };
   });
-  return { ...state, menu, orders };
+  return { ...state, menu, timing, bakeLog, orders };
 }
 
 /** Black or white, whichever reads better on the given background color. */

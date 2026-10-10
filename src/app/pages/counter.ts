@@ -2,10 +2,11 @@ import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { OrderCard } from './order-card';
+import { Eta } from './eta';
 
 @Component({
   selector: 'app-counter',
-  imports: [OrderCard, RouterLink],
+  imports: [OrderCard, RouterLink, Eta],
   template: `
     <main class="page">
       <div class="toolbar">
@@ -64,7 +65,7 @@ import { OrderCard } from './order-card';
           @for (order of making(); track order.id) {
             <div class="mini">
               <strong>#{{ order.number }}</strong>
-              <span class="muted">{{ order.status === 'new' ? 'Waiting' : 'Being made' }}</span>
+              <app-eta [orderId]="order.id" [compact]="true" />
             </div>
           } @empty {
             <p class="muted">None.</p>

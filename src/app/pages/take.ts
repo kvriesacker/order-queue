@@ -4,6 +4,7 @@ import { NewOrderItem, OTHER_COLOR } from '../models';
 
 const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
+import { clockTime, minutesUntil } from '../estimate';
 import { OrderCard } from './order-card';
 
 @Component({
@@ -102,6 +103,9 @@ import { OrderCard } from './order-card';
         @if (lastNumber()) {
           <p class="sent">
             Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
+            @if (lastEta(); as t) {
+              <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
+            }
           </p>
         } @else if (lastId()) {
           <p class="sent pending">Sending order…</p>
@@ -141,6 +145,9 @@ export class Take {
       .slice()
       .reverse(),
   );
+  protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
+  protected clock = clockTime;
+  protected until = (t: number) => minutesUntil(t, this.queue.now());
   protected lastNumber = computed(
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
   );

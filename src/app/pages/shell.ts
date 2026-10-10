@@ -16,7 +16,7 @@ import { QueueService } from '../queue.service';
         <a routerLink="oven" routerLinkActive="active">Oven</a>
         <a routerLink="counter" routerLinkActive="active">Counter</a>
         @if (queue.isHost()) {
-          <a routerLink="menu" routerLinkActive="active">Menu</a>
+          <a routerLink="menu" routerLinkActive="active">Settings</a>
         }
       </nav>
       <div class="topbar-end">

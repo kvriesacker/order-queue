@@ -1,6 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { Order, PizzaStatus, textOn } from '../models';
 import { QueueService } from '../queue.service';
+import { Eta } from './eta';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -43,6 +44,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
 
 @Component({
   selector: 'app-station',
+  imports: [Eta],
   template: `
     <main class="page kitchen">
       <section class="column">
@@ -62,6 +64,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                   {{ age(entry.order) }}</span
                 >
               </header>
+              <app-eta [orderId]="entry.order.id" />
               @if (entry.order.note) {
                 <p class="order-note">{{ entry.order.note }}</p>
               }

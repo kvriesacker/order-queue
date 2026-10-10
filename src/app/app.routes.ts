@@ -20,7 +20,7 @@ export const routes: Routes = [
       { path: 'kitchen', component: Station, title: 'Kitchen', data: { station: 'kitchen' } },
       { path: 'oven', component: Station, title: 'Oven', data: { station: 'oven' } },
       { path: 'counter', component: Counter, title: 'Counter' },
-      { path: 'menu', component: MenuPage, title: 'Menu' },
+      { path: 'menu', component: MenuPage, title: 'Settings' },
     ],
   },
   { path: '**', redirectTo: '' },

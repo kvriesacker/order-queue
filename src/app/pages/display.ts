@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
+import { clockTime } from '../estimate';
 
 /** Customer-facing screen: big numbers of orders ready for pickup. */
 @Component({
@@ -11,8 +12,13 @@ import { QueueService } from '../queue.service';
       <section class="display-col preparing">
         <h2>Preparing</h2>
         <div class="numbers">
-          @for (n of preparing(); track n) {
-            <span>{{ n }}</span>
+          @for (p of preparing(); track p.number) {
+            <span class="prep"
+              >{{ p.number }}
+              @if (p.eta) {
+                <small>≈ {{ clock(p.eta) }}</small>
+              }
+            </span>
           }
         </div>
       </section>
@@ -44,6 +50,7 @@ export class Display {
   protected queue = inject(QueueService);
   readonly id = input.required<string>();
   protected sound = signal(true);
+  protected clock = clockTime;
 
   private readyOrders = computed(() =>
     this.queue
@@ -57,7 +64,7 @@ export class Display {
     this.queue
       .orders()
       .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
-      .map((o) => o.number),
+      .map((o) => ({ number: o.number, eta: this.queue.estimates().get(o.id) })),
   );
 
   private seen = new Set<number>();

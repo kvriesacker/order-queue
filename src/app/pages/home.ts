@@ -2,12 +2,13 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { DEFAULT_MENU, MenuItem, QueueState } from '../models';
+import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, Timing } from '../models';
 import { MenuEditor } from './menu-editor';
+import { TimingEditor } from './timing-editor';
 
 @Component({
   selector: 'app-home',
-  imports: [FormsModule, MenuEditor],
+  imports: [FormsModule, MenuEditor, TimingEditor],
   template: `
     <main class="home">
       <h1 class="brand"><span aria-hidden="true">🍕</span> Pizza queue</h1>
@@ -24,6 +25,8 @@ import { MenuEditor } from './menu-editor';
           <span class="hint">Untick what you don’t sell and pick a color for each pizza.</span>
         </div>
         <app-menu-editor [(menu)]="menu" />
+        <strong>Estimated ready times</strong>
+        <app-timing-editor [(timing)]="timing" />
         @if (createError()) {
           <p class="error">{{ createError() }}</p>
         }
@@ -68,6 +71,7 @@ export class Home {
   joinError = signal('');
   createError = signal('');
   menu = signal<MenuItem[]>(lastMenu());
+  timing = signal<Timing>(lastTiming());
   mine = hostedQueues();
 
   create() {
@@ -77,10 +81,11 @@ export class Home {
     }
     try {
       localStorage.setItem(LAST_MENU_KEY, JSON.stringify(this.menu()));
+      localStorage.setItem(LAST_TIMING_KEY, JSON.stringify(this.timing()));
     } catch {
       // Not remembering the menu is fine.
     }
-    this.go(this.queue.create(this.name, this.menu()));
+    this.go(this.queue.create(this.name, this.menu(), this.timing()));
   }
 
   join() {
@@ -98,6 +103,17 @@ export class Home {
 }
 
 const LAST_MENU_KEY = 'pizza-queue:last-menu';
+const LAST_TIMING_KEY = 'pizza-queue:last-timing';
+
+function lastTiming(): Timing {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_TIMING_KEY) ?? 'null');
+    if (saved?.firstMinutes > 0 && saved?.perPizzaMinutes > 0) return saved;
+  } catch {
+    // Fall back to the default timing.
+  }
+  return { ...DEFAULT_TIMING };
+}
 
 /** The menu used for the last queue made in this browser, or the default one. */
 function lastMenu(): MenuItem[] {

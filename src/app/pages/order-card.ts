@@ -1,9 +1,11 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { Order, STATUS_LABELS } from '../models';
 import { QueueService } from '../queue.service';
+import { Eta } from './eta';
 
 @Component({
   selector: 'app-order-card',
+  imports: [Eta],
   template: `
     <article class="order" [class]="order().status">
       <header>
@@ -12,6 +14,9 @@ import { QueueService } from '../queue.service';
           <span class="customer">{{ order().customer }}</span>
         }
         <span class="age" [title]="'Ordered at ' + time()">{{ age() }}</span>
+      </header>
+      <header class="eta-row">
+        <app-eta [orderId]="order().id" />
       </header>
       <ul class="items">
         @for (item of order().items; track $index) {

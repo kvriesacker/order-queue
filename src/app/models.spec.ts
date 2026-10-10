@@ -1,7 +1,15 @@
 import { QueueAction, QueueState, applyAction, normalizeState } from './models';
 
 describe('applyAction', () => {
-  const empty: QueueState = { id: 'q', name: 'Test', nextNumber: 1, menu: [], orders: [] };
+  const empty: QueueState = {
+    id: 'q',
+    name: 'Test',
+    nextNumber: 1,
+    menu: [],
+    timing: { firstMinutes: 15, perPizzaMinutes: 4 },
+    bakeLog: [],
+    orders: [],
+  };
   const add = (id: string): QueueAction & { type: 'add' } => ({
     type: 'add',
     id,

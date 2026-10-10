@@ -1,29 +1,35 @@
-import { Component, effect, inject, signal, untracked } from '@angular/core';
-import { MenuItem } from '../models';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { MenuItem, Timing } from '../models';
 import { QueueService } from '../queue.service';
+import { currentPace } from '../estimate';
 import { MenuEditor } from './menu-editor';
+import { TimingEditor } from './timing-editor';
 
-/** Lets the host change the menu while the queue is running. */
+/** Lets the host change the menu and the starting time estimate while the queue runs. */
 @Component({
   selector: 'app-menu-page',
-  imports: [MenuEditor],
+  imports: [MenuEditor, TimingEditor],
   template: `
     <main class="page narrow-page">
       <section class="card stack">
-        <h1>Menu</h1>
+        <h1>Settings</h1>
         @if (queue.isHost()) {
+          <h2>Menu</h2>
           <p class="hint">Changes apply to new orders. Orders already placed keep their colors.</p>
           <app-menu-editor [(menu)]="menu" />
+          <h2>Estimated ready times</h2>
+          <app-timing-editor [(timing)]="timing" />
+          <p class="hint">Current pace: one pizza every {{ pace() }} min.</p>
           <div class="toolbar">
             <button class="btn primary" type="button" (click)="save()" [disabled]="!dirty()">
-              Save menu
+              Save settings
             </button>
             @if (saved()) {
               <span class="muted">Saved.</span>
             }
           </div>
         } @else {
-          <p class="muted">Only the device that started the queue can change the menu.</p>
+          <p class="muted">Only the device that started the queue can change the settings.</p>
         }
       </section>
     </main>
@@ -32,26 +38,35 @@ import { MenuEditor } from './menu-editor';
 export class MenuPage {
   protected queue = inject(QueueService);
   protected menu = signal<MenuItem[]>([]);
+  protected timing = signal<Timing>({ firstMinutes: 0, perPizzaMinutes: 0 });
   protected saved = signal(false);
   protected dirty = signal(false);
+  protected pace = computed(() => {
+    const state = this.queue.state();
+    return state ? Math.round((currentPace(state, this.queue.now()) / 60000) * 10) / 10 : 0;
+  });
 
   constructor() {
-    // Load the queue's menu once it's available.
+    // Load the queue's settings once available, unless the host is editing.
     effect(() => {
-      const menu = this.queue.state()?.menu;
-      if (menu && untracked(() => !this.dirty())) this.menu.set(menu);
+      const state = this.queue.state();
+      if (!state || untracked(this.dirty)) return;
+      this.menu.set(state.menu);
+      this.timing.set(state.timing);
     });
     effect(() => {
-      this.menu();
+      const draft = { menu: this.menu(), timing: this.timing() };
       untracked(() => {
-        const current = this.queue.state()?.menu;
-        this.dirty.set(JSON.stringify(current) !== JSON.stringify(this.menu()));
+        const state = this.queue.state();
+        const current = state && { menu: state.menu, timing: state.timing };
+        this.dirty.set(JSON.stringify(current) !== JSON.stringify(draft));
       });
     });
   }
 
   save() {
     this.queue.setMenu(this.menu());
+    this.queue.setTiming(this.timing());
     this.dirty.set(false);
     this.saved.set(true);
     setTimeout(() => this.saved.set(false), 2000);
