@@ -1,11 +1,27 @@
 export type OrderStatus =
   'new' | 'in-progress' | 'ready' | 'ready-for-customer' | 'collected' | 'cancelled';
 
+/** Where one pizza is in the kitchen. */
+export type PizzaStatus = 'new' | 'in-progress' | 'ready';
+
+export interface MenuItem {
+  name: string;
+  /** Hex color, so the kitchen can tell pizzas apart at a glance. */
+  color: string;
+  enabled: boolean;
+}
+
 export interface OrderItem {
   name: string;
   qty: number;
   note: string;
+  color: string;
+  /** One entry per pizza (qty of them), so the kitchen can bake them one by one. */
+  units: PizzaStatus[];
 }
+
+/** An order line as the order taker sends it, before the kitchen tracks its pizzas. */
+export type NewOrderItem = Pick<OrderItem, 'name' | 'qty' | 'note' | 'color'>;
 
 export interface Order {
   id: string;
@@ -22,15 +38,15 @@ export interface QueueState {
   id: string;
   name: string;
   nextNumber: number;
+  menu: MenuItem[];
   orders: Order[];
 }
 
 export type QueueAction =
-  | { type: 'add'; id: string; customer: string; items: OrderItem[]; note: string }
-  | { type: 'status'; id: string; status: OrderStatus };
-
-/** Messages sent over a peer data connection. */
-export type PeerMessage = { t: 'state'; state: QueueState } | { t: 'action'; action: QueueAction };
+  | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
+  | { type: 'status'; id: string; status: OrderStatus }
+  | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
+  | { type: 'menu'; menu: MenuItem[] };
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
@@ -41,25 +57,19 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-/** The step before each status, used for undo buttons. */
-export const PREVIOUS_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  'in-progress': 'new',
-  ready: 'in-progress',
-  'ready-for-customer': 'ready',
-  collected: 'ready-for-customer',
-};
+export const OTHER_COLOR = '#8a8a8a';
 
-export const MENU = [
-  { name: 'Margherita', emoji: '🍅' },
-  { name: 'Pepperoni', emoji: '🌶️' },
-  { name: 'Quattro Formaggi', emoji: '🧀' },
-  { name: 'Funghi', emoji: '🍄' },
-  { name: 'Hawaii', emoji: '🍍' },
-  { name: 'Diavola', emoji: '🔥' },
-  { name: 'Vegetariana', emoji: '🥦' },
-  { name: 'Prosciutto', emoji: '🥓' },
-  { name: 'Tonno', emoji: '🐟' },
-  { name: 'Calzone', emoji: '🥟' },
+export const DEFAULT_MENU: MenuItem[] = [
+  { name: 'Margherita', color: '#e53935', enabled: true },
+  { name: 'Pepperoni', color: '#8e24aa', enabled: true },
+  { name: 'Quattro Formaggi', color: '#fdd835', enabled: true },
+  { name: 'Funghi', color: '#6d4c41', enabled: true },
+  { name: 'Hawaii', color: '#fb8c00', enabled: true },
+  { name: 'Diavola', color: '#212121', enabled: true },
+  { name: 'Vegetariana', color: '#43a047', enabled: true },
+  { name: 'Prosciutto', color: '#ec407a', enabled: true },
+  { name: 'Tonno', color: '#1e88e5', enabled: true },
+  { name: 'Calzone', color: '#00acc1', enabled: true },
 ];
 
 /** Keeps at most this many finished (picked up or cancelled) orders in the queue. */
@@ -70,13 +80,18 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
   switch (action.type) {
     case 'add': {
       if (state.orders.some((o) => o.id === action.id)) return state;
-      const items = action.items
+      const items: OrderItem[] = action.items
         .filter((i) => i.name.trim() && i.qty > 0)
-        .map((i) => ({
-          name: i.name.trim().slice(0, 60),
-          qty: Math.min(99, Math.floor(i.qty)),
-          note: i.note.trim().slice(0, 120),
-        }));
+        .map((i) => {
+          const qty = Math.min(99, Math.floor(i.qty));
+          return {
+            name: i.name.trim().slice(0, 60),
+            qty,
+            note: i.note.trim().slice(0, 120),
+            color: isColor(i.color) ? i.color : OTHER_COLOR,
+            units: Array<PizzaStatus>(qty).fill('new'),
+          };
+        });
       if (!items.length) return state;
       const order: Order = {
         id: action.id,
@@ -98,12 +113,90 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       const target = state.orders.find((o) => o.id === action.id);
       if (!target || target.status === action.status || !(action.status in STATUS_LABELS))
         return state;
-      const orders = state.orders.map((o) =>
-        o.id === action.id ? { ...o, status: action.status, updatedAt: now } : o,
-      );
-      return { ...state, orders: trimFinished(orders) };
+      return updateOrder(state, action.id, (o) => {
+        let items = o.items;
+        // Moving a whole order back into the kitchen (undo at the counter) or forward
+        // past it keeps its pizzas consistent with the order.
+        if (
+          action.status === 'new' ||
+          action.status === 'in-progress' ||
+          action.status === 'ready'
+        ) {
+          const unit: PizzaStatus = action.status;
+          items = o.items.map((i) => ({ ...i, units: i.units.map(() => unit) }));
+        }
+        return { ...o, items, status: action.status, updatedAt: now };
+      });
+    }
+    case 'pizza': {
+      const target = state.orders.find((o) => o.id === action.id);
+      const current = target?.items[action.item]?.units[action.unit];
+      if (!target || !current || current === action.status) return state;
+      if (!['new', 'in-progress', 'ready'].includes(target.status)) return state;
+      if (!['new', 'in-progress', 'ready'].includes(action.status)) return state;
+      return updateOrder(state, action.id, (o) => {
+        const items = o.items.map((item, i) =>
+          i !== action.item
+            ? item
+            : { ...item, units: item.units.map((u, j) => (j === action.unit ? action.status : u)) },
+        );
+        return { ...o, items, status: kitchenStatus(items), updatedAt: now };
+      });
+    }
+    case 'menu': {
+      const menu = action.menu
+        .filter((m) => m.name.trim())
+        .slice(0, 50)
+        .map((m) => ({
+          name: m.name.trim().slice(0, 40),
+          color: isColor(m.color) ? m.color : OTHER_COLOR,
+          enabled: !!m.enabled,
+        }));
+      return { ...state, menu };
     }
   }
+}
+
+/** An order's kitchen status follows its pizzas: ready once every pizza is ready. */
+export function kitchenStatus(items: OrderItem[]): PizzaStatus {
+  const units = items.flatMap((i) => i.units);
+  if (units.every((u) => u === 'ready')) return 'ready';
+  if (units.every((u) => u === 'new')) return 'new';
+  return 'in-progress';
+}
+
+/** Upgrades a queue saved by an older version of the app (no menu, no per-pizza tracking). */
+export function normalizeState(state: QueueState): QueueState {
+  const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
+  const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
+  const orders = state.orders.map((o) => {
+    if (o.items.every((i) => Array.isArray(i.units) && i.color)) return o;
+    const unit: PizzaStatus =
+      o.status === 'new' ? 'new' : o.status === 'in-progress' ? 'in-progress' : 'ready';
+    const items = o.items.map((i) => ({
+      ...i,
+      color: i.color ?? colorOf(i.name),
+      units: Array.isArray(i.units) ? i.units : Array<PizzaStatus>(i.qty).fill(unit),
+    }));
+    return { ...o, items };
+  });
+  return { ...state, menu, orders };
+}
+
+/** Black or white, whichever reads better on the given background color. */
+export function textOn(color: string): string {
+  const n = parseInt(color.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160 ? '#1a1a1a' : '#ffffff';
+}
+
+function updateOrder(state: QueueState, id: string, fn: (o: Order) => Order): QueueState {
+  const orders = state.orders.map((o) => (o.id === id ? fn(o) : o));
+  return { ...state, orders: trimFinished(orders) };
+}
+
+function isColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 }
 
 function trimFinished(orders: Order[]): Order[] {

@@ -14,6 +14,9 @@ import { QueueService } from '../queue.service';
         <a routerLink="take" routerLinkActive="active">Orders</a>
         <a routerLink="kitchen" routerLinkActive="active">Kitchen</a>
         <a routerLink="counter" routerLinkActive="active">Counter</a>
+        @if (queue.isHost()) {
+          <a routerLink="menu" routerLinkActive="active">Menu</a>
+        }
       </nav>
       <div class="topbar-end">
         <span class="pill" [class]="pill().kind">{{ pill().text }}</span>

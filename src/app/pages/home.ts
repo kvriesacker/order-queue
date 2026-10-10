@@ -2,11 +2,12 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { QueueState } from '../models';
+import { DEFAULT_MENU, MenuItem, QueueState } from '../models';
+import { MenuEditor } from './menu-editor';
 
 @Component({
   selector: 'app-home',
-  imports: [FormsModule],
+  imports: [FormsModule, MenuEditor],
   template: `
     <main class="home">
       <h1 class="brand"><span aria-hidden="true">🍕</span> Pizza queue</h1>
@@ -18,7 +19,15 @@ import { QueueState } from '../models';
           Shop name
           <input name="name" [(ngModel)]="name" placeholder="Pizzeria Napoli" maxlength="40" />
         </label>
-        <button class="btn primary big" type="submit">Create queue</button>
+        <div class="stack tight">
+          <strong>Pizzas on the menu</strong>
+          <span class="hint">Untick what you don’t sell and pick a color for each pizza.</span>
+        </div>
+        <app-menu-editor [(menu)]="menu" />
+        @if (createError()) {
+          <p class="error">{{ createError() }}</p>
+        }
+        <button class="btn primary big" type="submit">Start queue</button>
         <p class="hint">
           Keep this browser tab open while the shop is running: it holds the orders.
         </p>
@@ -57,10 +66,21 @@ export class Home {
   name = '';
   code = '';
   joinError = signal('');
+  createError = signal('');
+  menu = signal<MenuItem[]>(lastMenu());
   mine = hostedQueues();
 
   create() {
-    this.go(this.queue.create(this.name));
+    if (!this.menu().some((m) => m.enabled)) {
+      this.createError.set('Tick at least one pizza.');
+      return;
+    }
+    try {
+      localStorage.setItem(LAST_MENU_KEY, JSON.stringify(this.menu()));
+    } catch {
+      // Not remembering the menu is fine.
+    }
+    this.go(this.queue.create(this.name, this.menu()));
   }
 
   join() {
@@ -75,6 +95,19 @@ export class Home {
   go(id: string) {
     this.router.navigate(['/q', id]);
   }
+}
+
+const LAST_MENU_KEY = 'pizza-queue:last-menu';
+
+/** The menu used for the last queue made in this browser, or the default one. */
+function lastMenu(): MenuItem[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_MENU_KEY) ?? 'null');
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch {
+    // Fall back to the default menu.
+  }
+  return DEFAULT_MENU.map((m) => ({ ...m }));
 }
 
 function hostedQueues(): QueueState[] {

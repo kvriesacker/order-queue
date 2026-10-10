@@ -16,6 +16,7 @@ import { QueueService } from '../queue.service';
       <ul class="items">
         @for (item of order().items; track $index) {
           <li>
+            <span class="dot" [style.background]="item.color"></span>
             <span class="qty">{{ item.qty }}×</span> {{ item.name }}
             @if (item.note) {
               <em class="note">{{ item.note }}</em>

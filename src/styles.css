@@ -309,6 +309,9 @@ input:focus {
 .inline input {
   flex: 1;
 }
+.inline input.swatch {
+  flex: none;
+}
 .cart {
   list-style: none;
   margin: 0;
@@ -605,4 +608,139 @@ input:focus {
   padding: 0.25rem 0.6rem;
   cursor: pointer;
   text-decoration: none;
+}
+
+/* Menu editor */
+.stack.tight {
+  gap: 0.15rem;
+}
+.menu-editor {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.menu-editor li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.menu-editor li.off {
+  opacity: 0.55;
+}
+.menu-editor .check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  font-weight: 600;
+  cursor: pointer;
+}
+.menu-editor .check input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--tomato);
+}
+.swatch {
+  width: 2.6rem;
+  height: 2.2rem;
+  padding: 0.15rem;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: none;
+}
+.narrow-page {
+  max-width: 640px;
+}
+
+/* Pizza colors */
+.dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: baseline;
+  border: 1px solid rgb(0 0 0 / 15%);
+}
+.menu-item {
+  border-left-width: 8px;
+}
+
+/* Kitchen */
+.kitchen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 1.2rem;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .kitchen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.kitchen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 420px) {
+  .kitchen-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pizzas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.pizzas li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem;
+  border-radius: 10px;
+  background: #fffaf3;
+}
+.pizzas li.in-progress {
+  background: #fde3e7;
+}
+.pizzas li.ready {
+  background: #dff3e5;
+}
+.chip {
+  font-weight: 800;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  font-size: 1.05rem;
+}
+.pizza-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+.pizza-meta .note {
+  padding-left: 0;
+  font-size: 0.9rem;
+}
+.pizza-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+.done {
+  color: var(--basil);
+  font-weight: 700;
 }

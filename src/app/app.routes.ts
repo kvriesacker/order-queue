@@ -6,6 +6,7 @@ import { Take } from './pages/take';
 import { Kitchen } from './pages/kitchen';
 import { Counter } from './pages/counter';
 import { Display } from './pages/display';
+import { MenuPage } from './pages/menu-page';
 
 export const routes: Routes = [
   { path: '', component: Home, title: 'Pizza queue' },
@@ -18,6 +19,7 @@ export const routes: Routes = [
       { path: 'take', component: Take, title: 'Take orders' },
       { path: 'kitchen', component: Kitchen, title: 'Kitchen' },
       { path: 'counter', component: Counter, title: 'Counter' },
+      { path: 'menu', component: MenuPage, title: 'Menu' },
     ],
   },
   { path: '**', redirectTo: '' },

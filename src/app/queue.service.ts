@@ -1,6 +1,16 @@
 import { Injectable, computed, signal } from '@angular/core';
 import mqtt, { type MqttClient } from 'mqtt';
-import { Order, QueueAction, QueueState, applyAction, randomId } from './models';
+import {
+  MenuItem,
+  NewOrderItem,
+  Order,
+  QueueAction,
+  QueueState,
+  applyAction,
+  PizzaStatus,
+  normalizeState,
+  randomId,
+} from './models';
 import { QueueCrypto } from './queue-crypto';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
@@ -33,11 +43,11 @@ export class QueueService {
   /** A guest's actions the host hasn't confirmed yet. */
   private readonly pending = signal<QueueAction[]>([]);
 
-  /** The queue with this guest's unconfirmed status changes applied, so taps show at once. */
+  /** The queue with this guest's unconfirmed changes applied, so taps show at once. */
   readonly state = computed(() => {
     const state = this.confirmed();
     if (!state) return null;
-    return this.pending().reduce((s, a) => (a.type === 'status' ? applyAction(s, a) : s), state);
+    return this.pending().reduce((s, a) => (a.type === 'add' ? s : applyAction(s, a)), state);
   });
   readonly orders = computed(() => this.state()?.orders ?? []);
 
@@ -58,12 +68,13 @@ export class QueueService {
   }
 
   /** Creates a new queue hosted by this browser and returns its id. */
-  create(name: string): string {
+  create(name: string, menu: MenuItem[]): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
       name: name.trim() || 'Pizza queue',
       nextNumber: 1,
+      menu,
       orders: [],
     };
     localStorage.setItem(HOST_KEY(id), JSON.stringify(state));
@@ -93,10 +104,18 @@ export class QueueService {
   }
 
   /** Adds an order and returns its id. */
-  addOrder(customer: string, items: Order['items'], note: string): string {
+  addOrder(customer: string, items: NewOrderItem[], note: string): string {
     const id = randomId(10);
     this.dispatch({ type: 'add', id, customer, items, note });
     return id;
+  }
+
+  setMenu(menu: MenuItem[]): void {
+    if (this.isHost()) this.applyAsHost({ type: 'menu', menu });
+  }
+
+  setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
+    this.dispatch({ type: 'pizza', id: order.id, item, unit, status });
   }
 
   setStatus(order: Order, status: Order['status']): void {
@@ -237,13 +256,15 @@ export class QueueService {
       case this.topic('state'): {
         const state = await crypto.decrypt<QueueState>(payload);
         if (!state || this.isHost() || crypto !== this.crypto) return;
-        this.confirmed.set(state);
+        this.confirmed.set(normalizeState(state));
         this.pending.update((p) => p.filter((a) => !isReflected(state, a)));
         break;
       }
       case this.topic('actions'): {
         const action = await crypto.decrypt<QueueAction>(payload);
-        if (action && this.isHost() && crypto === this.crypto) this.applyAsHost(action);
+        // Only the host itself may change the menu.
+        if (action && action.type !== 'menu' && this.isHost() && crypto === this.crypto)
+          this.applyAsHost(action);
         break;
       }
     }
@@ -298,7 +319,7 @@ export class QueueService {
   private loadHostState(id: string): QueueState | null {
     try {
       const raw = localStorage.getItem(HOST_KEY(id));
-      return raw ? (JSON.parse(raw) as QueueState) : null;
+      return raw ? normalizeState(JSON.parse(raw) as QueueState) : null;
     } catch {
       return null;
     }
@@ -306,8 +327,13 @@ export class QueueService {
 }
 
 function isReflected(state: QueueState, action: QueueAction): boolean {
+  if (action.type === 'menu') return true;
   const order = state.orders.find((o) => o.id === action.id);
   if (action.type === 'add') return !!order;
+  if (action.type === 'pizza') {
+    const unit = order?.items[action.item]?.units[action.unit];
+    return !unit || unit === action.status;
+  }
   return !order || order.status === action.status;
 }
 

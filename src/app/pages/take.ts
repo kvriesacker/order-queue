@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MENU, OrderItem } from '../models';
+import { NewOrderItem, OTHER_COLOR } from '../models';
 import { QueueService } from '../queue.service';
 import { OrderCard } from './order-card';
 
@@ -12,9 +12,14 @@ import { OrderCard } from './order-card';
       <section class="card stack">
         <h1>New order</h1>
         <div class="menu">
-          @for (pizza of menu; track pizza.name) {
-            <button class="menu-item" type="button" (click)="add(pizza.name)">
-              <span aria-hidden="true">{{ pizza.emoji }}</span> {{ pizza.name }}
+          @for (pizza of menu(); track pizza.name) {
+            <button
+              class="menu-item"
+              type="button"
+              [style.border-left-color]="pizza.color"
+              (click)="add(pizza.name, pizza.color)"
+            >
+              {{ pizza.name }}
             </button>
           }
         </div>
@@ -46,7 +51,9 @@ import { OrderCard } from './order-card';
                     +
                   </button>
                 </div>
-                <span class="line-name">{{ line.name }}</span>
+                <span class="line-name"
+                  ><span class="dot" [style.background]="line.color"></span>{{ line.name }}</span
+                >
                 <input
                   class="line-note"
                   [ngModel]="line.note"
@@ -106,8 +113,8 @@ import { OrderCard } from './order-card';
 })
 export class Take {
   protected queue = inject(QueueService);
-  protected menu = MENU;
-  protected cart = signal<OrderItem[]>([]);
+  protected menu = computed(() => (this.queue.state()?.menu ?? []).filter((m) => m.enabled));
+  protected cart = signal<NewOrderItem[]>([]);
   protected custom = '';
   protected customer = '';
   protected note = '';
@@ -125,17 +132,17 @@ export class Take {
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
   );
 
-  add(name: string) {
+  add(name: string, color: string) {
     this.cart.update((cart) => {
       const i = cart.findIndex((l) => l.name === name && !l.note);
       if (i >= 0) return cart.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
-      return [...cart, { name, qty: 1, note: '' }];
+      return [...cart, { name, qty: 1, note: '', color }];
     });
   }
 
   addCustom() {
     if (!this.custom.trim()) return;
-    this.add(this.custom.trim());
+    this.add(this.custom.trim(), OTHER_COLOR);
     this.custom = '';
   }
 
