@@ -23,6 +23,9 @@ export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 const HOST_KEY = (id: string) => `pizza-queue:host:${id}`;
 /** A staff device's copy of the queue, so it can take over when the host is gone. */
 const COPY_KEY = (id: string) => `pizza-queue:copy:${id}`;
+/** Finished orders cleared from the live queue, kept on each device for the statistics. */
+const ARCHIVE_KEY = (id: string) => `pizza-queue:archive:${id}`;
+const ARCHIVE_MAX = 3000;
 /** How long a starting host listens for a newer host before publishing anything. */
 const HOST_GATE_MS = 1500;
 /** How long a device that wants to take over waits for competing claims. */
@@ -46,6 +49,8 @@ export class QueueService {
   /** For guests: whether the host's browser is connected (null until known). */
   readonly hostOnline = signal<boolean | null>(null);
   readonly guestCount = signal(0);
+  /** Finished orders no longer in the live queue, so statistics cover the whole event. */
+  readonly archive = signal<Order[]>([]);
   /** True while this device is trying to take over as host. */
   readonly takingOver = signal(false);
   /** Ids of orders this device sent that were refused because too few pizzas were left. */
@@ -139,6 +144,7 @@ export class QueueService {
 
     // Staff devices keep a copy, so the queue shows (and can be taken over) even offline.
     this.confirmed.set(this.loadHostState(id) ?? this.loadCopy(id));
+    this.archive.set(this.loadArchive(id));
     this.connectAs(false);
     if (this.loadHostState(id)) this.claimHost(id);
   }
@@ -237,6 +243,7 @@ export class QueueService {
     this.queueId = '';
     this.crypto = null;
     this.confirmed.set(null);
+    this.archive.set([]);
     this.pending.set([]);
     this.isHost.set(false);
     this.hostOnline.set(null);
@@ -407,6 +414,7 @@ export class QueueService {
         if (this.claim && next.hostEpoch >= this.claim.epoch) this.claim.aborted = true;
         // Ignore an old host's queue once a newer one is known.
         if (mine && next.hostEpoch < mine.hostEpoch) return;
+        if (mine) this.archiveDropped(mine, next);
         this.confirmed.set(next);
         this.saveCopy(next);
         // An order the host can't accept (too few pizzas left) won't ever arrive; drop it.
@@ -453,10 +461,37 @@ export class QueueService {
         this.refuse(action.id);
       return;
     }
+    this.archiveDropped(state, next);
     this.confirmed.set(next);
     localStorage.setItem(HOST_KEY(next.id), JSON.stringify(next));
     this.publishState();
     this.publishTracking();
+  }
+
+  /** Keeps orders that the queue clears (old picked-up ones) for the statistics. */
+  private archiveDropped(before: QueueState, after: QueueState): void {
+    const kept = new Set(after.orders.map((o) => o.id));
+    const dropped = before.orders.filter((o) => !kept.has(o.id));
+    if (!dropped.length) return;
+    const known = new Set(this.archive().map((o) => o.id));
+    const archive = [...this.archive(), ...dropped.filter((o) => !known.has(o.id))].slice(
+      -ARCHIVE_MAX,
+    );
+    this.archive.set(archive);
+    try {
+      localStorage.setItem(ARCHIVE_KEY(after.id), JSON.stringify(archive));
+    } catch {
+      // Storage full; statistics then only cover the live queue.
+    }
+  }
+
+  private loadArchive(id: string): Order[] {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ARCHIVE_KEY(id)) ?? '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
   }
 
   /**

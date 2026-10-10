@@ -15,6 +15,7 @@ import { QueueService } from '../queue.service';
         <a routerLink="kitchen" routerLinkActive="active">Kitchen</a>
         <a routerLink="oven" routerLinkActive="active">Oven</a>
         <a routerLink="counter" routerLinkActive="active">Counter</a>
+        <a routerLink="stats" routerLinkActive="active">Stats</a>
         @if (queue.isHost()) {
           <a routerLink="menu" routerLinkActive="active">Settings</a>
         }

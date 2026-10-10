@@ -9,6 +9,7 @@ import { Display } from './pages/display';
 import { MenuPage } from './pages/menu-page';
 import { OrderScreen } from './pages/order-screen';
 import { Track } from './pages/track';
+import { Stats } from './pages/stats';
 
 export const routes: Routes = [
   { path: '', component: Home, title: 'Pizza queue' },
@@ -24,6 +25,7 @@ export const routes: Routes = [
       { path: 'kitchen', component: Station, title: 'Kitchen', data: { station: 'kitchen' } },
       { path: 'oven', component: Station, title: 'Oven', data: { station: 'oven' } },
       { path: 'counter', component: Counter, title: 'Counter' },
+      { path: 'stats', component: Stats, title: 'Statistics' },
       { path: 'menu', component: MenuPage, title: 'Settings' },
     ],
   },

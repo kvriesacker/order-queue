@@ -8,6 +8,10 @@ A shared order queue for a pizza shop, built with Angular. Everything runs in th
 4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
 5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected with the name and pizzas (and a chime) and, for every order still being made, the customer's name, the pizzas (types and counts, without notes) and the estimated ready time. Mark an order "Picked up" to clear it from the screen.
 
+## Statistics
+
+The **Stats** tab shows what was sold: pizzas per type, the busiest 15 minutes, how long prepare, bake and counter really took compared with the settings, the average wait, cancellations, the most asked-for notes and when the pizzas sold out. A "For next time" list turns those into tips. **Download CSV** saves one row per pizza for a spreadsheet, so the numbers survive after the queue ends.
+
 ## Estimated ready times
 
 Every open order shows an estimated ready time on each screen, including the customer screen. The estimate is split into three phases:
