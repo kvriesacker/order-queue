@@ -43,7 +43,10 @@ npm install
 npm start          # http://localhost:4200
 npm test -- --watch=false
 npm run build      # output in dist/order-queue/browser
+npm run e2e        # browser tests against the build (run npm run build first)
 ```
+
+The deploy workflow runs the unit tests and the browser tests, and only publishes when both pass.
 
 ## Publish on GitHub Pages
 

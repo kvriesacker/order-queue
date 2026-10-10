@@ -80,7 +80,7 @@ import { clockTime } from '../estimate';
               @for (p of s().perPizza; track p.name) {
                 <li [title]="p.name + ': ' + p.count + ' pizzas'">
                   <span class="bar-label"
-                    ><span class="swatch" [style.background]="p.color"></span>{{ p.name }}</span
+                    ><span class="legend-swatch" [style.background]="p.color"></span>{{ p.name }}</span
                   >
                   <span class="bar-track"
                     ><span

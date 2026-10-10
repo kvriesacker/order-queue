@@ -637,7 +637,8 @@ input:focus {
   height: 1.2rem;
   accent-color: var(--tomato);
 }
-.swatch {
+/* The pizza color picker. */
+input.swatch {
   width: 2.6rem;
   height: 2.2rem;
   padding: 0.15rem;
@@ -1222,7 +1223,8 @@ input:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.swatch {
+/* Color square in a chart legend (not the color picker, which is input.swatch). */
+.legend-swatch {
   flex: none;
   width: 0.7rem;
   height: 0.7rem;

@@ -14,7 +14,7 @@ import { MenuItem } from '../models';
             <input
               type="checkbox"
               [checked]="item.enabled"
-              (change)="update($index, { enabled: !item.enabled })"
+              (change)="update($index, { enabled: $any($event.target).checked })"
             />
             <span class="name">{{ item.name }}</span>
           </label>

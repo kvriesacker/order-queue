@@ -26,6 +26,11 @@ jobs:
       - run: npm ci
       - run: npx ng test --watch=false
       - run: npx ng build
+      # Browser tests against the build (color picker and more); a failure stops the deploy.
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          CI: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/order-queue/browser

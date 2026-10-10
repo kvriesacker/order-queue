@@ -86,8 +86,10 @@ export class MenuPage {
       const draft = { menu: this.menu(), timing: this.timing() };
       untracked(() => {
         const state = this.queue.state();
+        // Until the queue has loaded there's nothing to compare with, so nothing is edited
+        // yet; otherwise the queue's menu would never be loaded into the editor.
         const current = state && { menu: state.menu, timing: state.timing };
-        this.dirty.set(JSON.stringify(current) !== JSON.stringify(draft));
+        this.dirty.set(!!current && JSON.stringify(current) !== JSON.stringify(draft));
       });
     });
   }
