@@ -7,10 +7,14 @@ import { Station } from './pages/station';
 import { Counter } from './pages/counter';
 import { Display } from './pages/display';
 import { MenuPage } from './pages/menu-page';
+import { OrderScreen } from './pages/order-screen';
+import { Track } from './pages/track';
 
 export const routes: Routes = [
   { path: '', component: Home, title: 'Pizza queue' },
   { path: 'q/:id/display', component: Display, title: 'Orders ready' },
+  { path: 'q/:id/order-screen', component: OrderScreen, title: 'Your order' },
+  { path: 'track/:order', component: Track, title: 'Your order' },
   {
     path: 'q/:id',
     component: Shell,

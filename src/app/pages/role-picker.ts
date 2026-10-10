@@ -30,6 +30,14 @@ import { RouterLink } from '@angular/router';
             >Box the baked pizzas, call the numbers and show them on the customer screen.</span
           >
         </a>
+        <a class="card role" routerLink="order-screen">
+          <span class="role-icon" aria-hidden="true">📱</span>
+          <strong>Customer order screen</strong>
+          <span class="muted"
+            >Faces the customer while ordering: their number, ready time and a code to follow
+            it.</span
+          >
+        </a>
       </div>
     </main>
   `,

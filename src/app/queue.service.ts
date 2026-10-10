@@ -14,6 +14,7 @@ import {
 } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
+import { OrderTrack, TRACK_AFTER_DONE, orderTrack, trackCrypto } from './tracking';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 
@@ -70,8 +71,15 @@ export class QueueService {
   private inbox = Promise.resolve();
   private outbox = Promise.resolve();
 
+  /** Per order id: the tracking info last published for customers' phones. */
+  private tracked = new Map<string, string>();
+  private trackKeys = new Map<string, Promise<QueueCrypto>>();
+
   constructor() {
-    setInterval(() => this.now.set(Date.now()), 15000);
+    setInterval(() => {
+      this.now.set(Date.now());
+      this.publishTracking();
+    }, 15000);
   }
 
   /** Creates a new queue hosted by this browser and returns its id. */
@@ -135,9 +143,12 @@ export class QueueService {
   }
 
   shareLink(id = this.queueId): string {
-    const { origin, pathname } = window.location;
-    const search = BROKER_OVERRIDE ? `?broker=${encodeURIComponent(BROKER_OVERRIDE)}` : '';
-    return `${origin}${pathname}${search}#/q/${id}`;
+    return `${appBase()}#/q/${id}`;
+  }
+
+  /** The link a customer scans to follow one order (it doesn't give access to the queue). */
+  trackLink(orderId: string): string {
+    return `${appBase()}#/track/${orderId}`;
   }
 
   private close(): void {
@@ -154,6 +165,8 @@ export class QueueService {
     this.hostOnline.set(null);
     this.guestCount.set(0);
     this.connection.set('idle');
+    this.tracked.clear();
+    this.trackKeys.clear();
   }
 
   /**
@@ -193,7 +206,7 @@ export class QueueService {
     this.disconnect();
     this.isHost.set(host);
     this.connection.set('connecting');
-    const client = mqtt.connect(BROKER_OVERRIDE ?? DEFAULT_BROKER, {
+    const client = mqtt.connect(brokerUrl(), {
       clientId: `pq-${this.clientId}`,
       clean: true,
       keepalive: 30,
@@ -214,6 +227,8 @@ export class QueueService {
       if (host) {
         client.publish(this.topic('host'), '1', { qos: 1, retain: true });
         this.publishState();
+        this.tracked.clear();
+        this.publishTracking();
       } else {
         this.announce();
       }
@@ -296,6 +311,46 @@ export class QueueService {
     this.confirmed.set(next);
     localStorage.setItem(HOST_KEY(next.id), JSON.stringify(next));
     this.publishState();
+    this.publishTracking();
+  }
+
+  /**
+   * Publishes each order's status and estimate for customers following it on their phone,
+   * only when something they'd see changed, and clears orders nobody needs to follow.
+   */
+  private publishTracking(): void {
+    const state = this.confirmed();
+    const client = this.client;
+    if (!state || !client?.connected || !this.isHost()) return;
+    const now = Date.now();
+    const etas = estimateReady(state, now);
+    const followed = state.orders.filter(
+      (o) =>
+        !(o.status === 'collected' || o.status === 'cancelled') ||
+        now - o.updatedAt < TRACK_AFTER_DONE,
+    );
+    const updates: [string, OrderTrack | null][] = followed.map((o) => [
+      o.id,
+      orderTrack(state, o, etas.get(o.id)),
+    ]);
+    for (const id of this.tracked.keys()) {
+      if (!followed.some((o) => o.id === id)) updates.push([id, null]);
+    }
+    for (const [id, track] of updates) {
+      const json = JSON.stringify(track);
+      if (this.tracked.get(id) === json) continue;
+      if (track) this.tracked.set(id, json);
+      else this.tracked.delete(id);
+      if (!this.trackKeys.has(id)) this.trackKeys.set(id, trackCrypto(id));
+      const key = this.trackKeys.get(id)!;
+      this.outbox = this.outbox.then(async () => {
+        const crypto = await key;
+        // An empty retained message removes the order from the broker.
+        const payload = track ? await crypto.encrypt(track) : '';
+        client.publish(`${crypto.topic}/order`, payload, { qos: 1, retain: true });
+      });
+      if (!track) this.trackKeys.delete(id);
+    }
   }
 
   private publishState(): void {
@@ -348,6 +403,18 @@ function isReflected(state: QueueState, action: QueueAction): boolean {
     return !unit || unit === action.status;
   }
   return !order || order.status === action.status;
+}
+
+/** The MQTT broker every device connects to. */
+export function brokerUrl(): string {
+  return BROKER_OVERRIDE ?? DEFAULT_BROKER;
+}
+
+/** This app's address, keeping a broker override so links work in local tests too. */
+function appBase(): string {
+  const { origin, pathname } = window.location;
+  const search = BROKER_OVERRIDE ? `?broker=${encodeURIComponent(BROKER_OVERRIDE)}` : '';
+  return `${origin}${pathname}${search}`;
 }
 
 /**

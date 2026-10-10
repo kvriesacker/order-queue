@@ -3,7 +3,7 @@
 A shared order queue for a pizza shop, built with Angular. Everything runs in the browser: there is no backend.
 
 1. **Create a queue**: tick the pizzas you sell, add your own and give each a color, and set starting times for each phase (prepare, bake, counter) and how many ovens you have. Share the link with your team. The host can change these later under **Settings**.
-2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number.
+2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number. Open the **customer screen** (button next to "New order") on a display facing the customer: it shows the order just placed with its ready time and a QR code. Scanning it opens a page on the customer's phone that follows that one order until it's ready.
 3. **Kitchen**: every pizza has its own row in its menu color, with its note. Mark each pizza **Prepared** when it's ready for the oven.
 4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
 5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected with the name and pizzas (and a chime) and, for every order still being made, the customer's name, the pizzas (types and counts, without notes) and the estimated ready time. Mark an order "Picked up" to clear it from the screen.
@@ -26,6 +26,7 @@ The browser that created the queue is the host: it keeps the orders (saved in it
 
 - Keep the creator's tab open while the shop is running. If it closes, everyone still sees the last queue, and new orders and changes are delivered when it's back.
 - Other devices reconnect automatically.
+- The QR code link only lets someone follow their own order: the host publishes each order's status separately, encrypted with a key derived from the order id, so the queue link is never shared with customers.
 - To use another broker, add `?broker=wss://host:port/path` to the URL before the `#`.
 
 ## Develop

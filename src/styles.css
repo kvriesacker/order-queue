@@ -892,3 +892,208 @@ input:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Order page header with the customer screen link */
+.take-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Customer order screen: faces the customer while ordering */
+.order-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1b1412;
+  color: #fff;
+  padding: 2rem clamp(1rem, 4vw, 3rem) 0;
+}
+.os-shop {
+  font-size: clamp(1.2rem, 2.5vw, 2rem);
+  font-weight: 800;
+  color: var(--crust);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.os-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 2rem;
+  align-items: center;
+}
+.os-label {
+  font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+  color: #d9c8bb;
+}
+.os-number {
+  font-size: clamp(6rem, 22vw, 16rem);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--crust);
+}
+.os-name {
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  font-weight: 800;
+}
+.os-pizzas {
+  font-size: clamp(1.1rem, 2.6vw, 2rem);
+  color: #d9c8bb;
+  margin-top: 0.3rem;
+}
+.os-eta {
+  margin-top: 1.4rem;
+  font-size: clamp(1.2rem, 3vw, 2.2rem);
+}
+.os-eta strong {
+  color: var(--crust);
+}
+.os-eta span {
+  color: #b9a79a;
+}
+.os-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  color: #d9c8bb;
+}
+.os-qr .qr {
+  width: min(100%, 22rem);
+  background: #fff;
+  border-radius: 1rem;
+  padding: 0.6rem;
+}
+.os-qr .qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.os-idle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+}
+.os-welcome {
+  font-size: clamp(3rem, 10vw, 7rem);
+  font-weight: 900;
+  color: var(--crust);
+}
+.os-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+.os-footer button,
+.os-footer a {
+  background: none;
+  border: 1px solid #4a3a33;
+  color: #b9a79a;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  .os-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A customer following their order on their phone */
+.track {
+  min-height: 100vh;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.track-shop {
+  font-weight: 800;
+  color: var(--tomato);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.track-label {
+  margin-top: 1rem;
+  color: var(--muted);
+}
+.track-number {
+  font-size: 6rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.track.is-ready .track-number {
+  color: var(--tomato);
+}
+.track-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.track-pizzas {
+  color: var(--muted);
+}
+.track-eta {
+  margin-top: 1rem;
+  font-size: 1.4rem;
+}
+.track-eta span {
+  display: block;
+  font-size: 1rem;
+  color: var(--muted);
+}
+.track-big {
+  margin-top: 1rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.track-steps {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+.track-steps li {
+  padding-top: 0.6rem;
+  border-top: 6px solid var(--line);
+  color: var(--muted);
+}
+.track-steps li.done {
+  border-color: var(--tomato);
+  color: inherit;
+  font-weight: 700;
+}
+.track-foot {
+  margin-top: auto;
+  padding-top: 2rem;
+  font-size: 0.85rem;
+}
+:where(.order-screen, .track) p {
+  margin: 0;
+}
+.os-number {
+  margin: 0.5rem 0 1rem;
+}
+.track-number {
+  margin: 0.3rem 0 0.6rem;
+}

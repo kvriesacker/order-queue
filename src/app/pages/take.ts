@@ -13,7 +13,12 @@ import { OrderCard } from './order-card';
   template: `
     <main class="page take">
       <section class="card stack">
-        <h1>New order</h1>
+        <div class="take-head">
+          <h1>New order</h1>
+          <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
+            >Customer screen ↗</a
+          >
+        </div>
         <div class="menu">
           @for (pizza of menu(); track pizza.name) {
             <button
@@ -147,6 +152,8 @@ export class Take {
   );
   protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
   protected clock = clockTime;
+  /** The screen facing the customer while ordering, best opened on a second display. */
+  protected screenLink = computed(() => this.queue.shareLink(this.queue.state()?.id) + '/order-screen');
   protected until = (t: number) => minutesUntil(t, this.queue.now());
   protected lastNumber = computed(
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
