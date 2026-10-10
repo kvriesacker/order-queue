@@ -6,7 +6,7 @@ A shared order queue for a pizza shop, built with Angular. Everything runs in th
 2. **Orders**: tap pizzas (each one gets its own line and note) and send the order to the kitchen. The customer gets an order number.
 3. **Kitchen**: every pizza has its own row in its menu color, with its note. Mark each pizza **Prepared** when it's ready for the oven.
 4. **Oven**: prepared pizzas show up here. Mark each one **Baked**; the order goes to the counter once all its pizzas are baked.
-5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected (with a chime) and, for every order still being made, the customer's name, the pizzas (types and counts, without notes) and the estimated ready time. Mark an order "Picked up" to clear it from the screen.
+5. **Counter**: mark baked orders "Ready for customer" and open the **customer screen**, which shows the numbers that can be collected with the name and pizzas (and a chime) and, for every order still being made, the customer's name, the pizzas (types and counts, without notes) and the estimated ready time. Mark an order "Picked up" to clear it from the screen.
 
 ## Estimated ready times
 

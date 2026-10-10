@@ -42,6 +42,7 @@ import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
               @if (o.customer) {
                 <small>{{ o.customer }}</small>
               }
+              <small class="called-pizzas">{{ summary(o) }}</small>
             </span>
           }
         </div>
@@ -67,6 +68,7 @@ export class Display {
   readonly id = input.required<string>();
   protected sound = signal(true);
   protected clock = clockTime;
+  protected summary = pizzaSummary;
   protected until = (t: number) => minutesUntil(t, this.queue.now());
 
   protected readyOrders = computed(() =>
