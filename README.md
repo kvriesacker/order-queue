@@ -35,7 +35,7 @@ Devices sync through a free public MQTT broker ([HiveMQ](https://www.hivemq.com/
 The browser that created the queue is the host: it keeps the orders (saved in its local storage), applies every change and publishes the latest queue.
 
 - Keep the creator's tab open while the shop is running. If it closes, everyone still sees the last queue (every staff device keeps a copy), and new orders and changes are delivered when it's back.
-- If the host's device is gone for good, anyone on the Orders, Kitchen, Oven or Counter tabs can press **Become host** in the "host is offline" message. Devices that press it at the same time agree on exactly one new host, so order numbers and the pizza limit stay right. When the old host comes back, it sees the newer queue and joins as a normal device instead of overwriting it.
+- If the host's device is gone for good, anyone on the Orders, Kitchen, Oven or Counter tabs can press **Become host** in the "host is offline" message. Devices that press it at the same time agree on exactly one new host, so order numbers and the pizza limit stay right. The message only shows once the host has been away for a few seconds, so a host reloading its page doesn't trigger it (a host that loses its connection is noticed after up to about 45 seconds). When the old host comes back, it sees the newer queue and joins as a normal device instead of overwriting it; orders it took while it was offline are passed on to the new host and get the next numbers.
 - Other devices reconnect automatically.
 - The QR code link only lets someone follow their own order: the host publishes each order's status separately, encrypted with a key derived from the order id, so the queue link is never shared with customers.
 - To use another broker, add `?broker=wss://host:port/path` to the URL before the `#`.
@@ -52,7 +52,7 @@ npm run build      # output in dist/order-queue/browser
 npm run e2e        # browser tests against the build (run npm run build first)
 ```
 
-The deploy workflow runs the unit tests and the browser tests, and only publishes when both pass.
+The deploy workflow runs the unit tests and the browser tests, and only publishes when both pass. The browser tests start a local MQTT broker (`e2e/broker.mjs`) so several devices (Orders, Kitchen, Oven, Counter, each in its own browser) can work on one queue, including the host closing its tab, losing its connection, reloading, and other devices taking over.
 
 ## Publish on GitHub Pages
 

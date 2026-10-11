@@ -51,6 +51,13 @@ const ARCHIVE_KEY = (id: string) => `pizza-queue:archive:${id}`;
 const ARCHIVE_MAX = 3000;
 /** How long a starting host listens for a newer host before publishing anything. */
 const HOST_GATE_MS = 1500;
+/**
+ * How long the host may be away before staff are offered to take over. A host reloading its
+ * page drops off for a moment and is back within a second or two.
+ */
+const HOST_GONE_MS = 5000;
+/** Orders a host remembers having added, to hand over if a newer host missed them. */
+const HOST_ADDS_KEPT = 100;
 /** How long a device that wants to take over waits for competing claims. */
 const CLAIM_MS = 2500;
 const DEFAULT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
@@ -146,6 +153,13 @@ export class QueueService {
   private gateTimer: ReturnType<typeof setTimeout> | undefined;
   /** This device's attempt to take over, and the competing claims it heard. */
   private claim: { epoch: number; id: string; seen: Claim[]; aborted: boolean } | null = null;
+  private hostGoneTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * Orders this device added while hosting. If its connection was down and another device
+   * took over meanwhile, the open ones the new host doesn't have go there instead of getting
+   * lost. (A connection can look fine while it's down, so the recent ones are all kept.)
+   */
+  private hostAdds: QueueAction[] = [];
 
   /** Per order id: the tracking info last published for customers' phones. */
   private tracked = new Map<string, string>();
@@ -354,6 +368,7 @@ export class QueueService {
     this.tracked.clear();
     this.trackKeys.clear();
     this.claim = null;
+    this.hostAdds = [];
     this.takingOver.set(false);
     this.draftChannel?.close();
     this.draftChannel = null;
@@ -465,6 +480,7 @@ export class QueueService {
   private disconnect(): void {
     clearInterval(this.presenceTimer);
     clearTimeout(this.gateTimer);
+    clearTimeout(this.hostGoneTimer);
     const client = this.client;
     this.client = null;
     if (!client) return;
@@ -491,14 +507,24 @@ export class QueueService {
         const [flag, hostId = ''] = payload.split(':');
         const online = flag === '1';
         if (this.isHost()) {
-          // Someone else's message (such as an old host's "gone" notice) replaced ours.
-          if (this.hostReady && payload !== `1:${this.confirmed()?.hostId}`) this.announceHost();
+          // Someone else's message (such as an old host's "gone" notice) replaced ours. Send
+          // our queue too: if another host is still around, the older of the two steps down.
+          if (this.hostReady && payload !== `1:${this.confirmed()?.hostId}`) {
+            this.announceHost();
+            if (online) this.publishState();
+          }
           break;
         }
         if (online && this.claim) this.claim.aborted = true;
         // An old host dropping off after a takeover says nothing about the current host.
         const current = this.confirmed()?.hostId;
         if (!online && hostId && current && hostId !== current) break;
+        clearTimeout(this.hostGoneTimer);
+        if (!online && this.hostOnline() === true) {
+          // Only call the host gone once it stays away (not while it reloads its page).
+          this.hostGoneTimer = setTimeout(() => this.hostOnline.set(false), HOST_GONE_MS);
+          break;
+        }
         const wasOnline = this.hostOnline() === true;
         this.hostOnline.set(online);
         // The host may have missed actions sent while it was away; send them again.
@@ -520,6 +546,13 @@ export class QueueService {
         if (this.isHost()) {
           // A newer host took over: step down and follow it.
           if (mine && outranks(next, mine)) this.stepDown(next);
+          // An old host's queue replaced ours on the broker (it sent it once its stalled
+          // connection came back): put ours back, so nobody picks up the old one and that
+          // host sees ours and steps down.
+          else if (mine && outranks(mine, next) && this.hostReady) {
+            this.announceHost();
+            this.publishState();
+          }
           return;
         }
         if (this.claim && next.hostEpoch >= this.claim.epoch) this.claim.aborted = true;
@@ -575,6 +608,7 @@ export class QueueService {
     this.archiveDropped(state, next);
     this.confirmed.set(next);
     localStorage.setItem(HOST_KEY(next.id), JSON.stringify(next));
+    if (action.type === 'add') this.hostAdds = [...this.hostAdds, action].slice(-HOST_ADDS_KEPT);
     this.publishState();
     this.publishTracking();
   }
@@ -652,10 +686,19 @@ export class QueueService {
   /** Another device hosts now: keep this queue only as a copy and join as staff. */
   private stepDown(newer: QueueState): void {
     const id = this.queueId;
+    const mine = this.confirmed();
     this.isHost.set(false);
     localStorage.removeItem(HOST_KEY(id));
     this.saveCopy(newer);
     this.confirmed.set(newer);
+    // Send orders this device took while offline to the new host (once it's seen online).
+    const open = (a: QueueAction) => {
+      const o = mine?.orders.find((o) => a.type === 'add' && o.id === a.id);
+      return !!o && o.status !== 'collected' && o.status !== 'cancelled';
+    };
+    this.pending.set(this.hostAdds.filter((a) => open(a) && !isReflected(newer, a)));
+    this.hostAdds = [];
+    this.hostOnline.set(null);
     this.connectAs(false);
     this.releaseHostLock?.();
     this.releaseHostLock = null;
