@@ -181,7 +181,7 @@ import { OrderCard } from './order-card';
           </p>
           @if (!cart().length) {
             <button class="btn qr-again" type="button" (click)="showQr.set(!showQr())">
-              {{ showQr() ? 'Hide QR code' : 'Show QR code again' }}
+              {{ showQr() ? 'Hide QR code' : 'Show QR code' }}
             </button>
           }
         } @else if (lastId()) {
@@ -215,7 +215,7 @@ export class Take {
   private pos = orderPoint();
   /** The id the order being taken will get, so the customer can scan its QR code early. */
   private draftId = signal(randomId(10));
-  /** Show the QR code of the order just sent on the customer screen again. */
+  /** Keep showing the QR code of the order just sent on the customer screen (on by default). */
   protected showQr = signal(false);
   protected note = '';
   /** The id of the order just sent, so we can show its number once the host assigns it. */
@@ -366,7 +366,7 @@ export class Take {
     const cart = this.cart();
     const id = this.queue.addOrder(this.customer(), cart, this.note, this.draftId());
     this.draftId.set(randomId(10));
-    this.showQr.set(false);
+    this.showQr.set(true);
     this.lastId.set(id);
     // Keep the order to try again if it gets refused.
     this.lastCart = { cart, customer: this.customer(), note: this.note };

@@ -38,7 +38,7 @@ export interface OrderDraft {
   pizzas: { name: string; color: string; price?: number }[];
   /** The order this order point sent last. */
   sentId: string;
-  /** Show the QR code of the order just sent again. */
+  /** Keep showing the QR code of the order just sent. */
   showQr: boolean;
   at: number;
 }

@@ -14,7 +14,7 @@ const DRAFT_MAX_AGE = 60 * 60000;
 /**
  * Screen facing the customer where they order. While the order is taken it shows what's in
  * it, with a QR code to follow it on their phone. Once sent, it shows the order number and
- * estimated time (the QR code again only when the order taker asks). In between it says
+ * estimated time, still with the QR code unless the order taker hides it. In between it says
  * "Next customer". No menu, made for full screen.
  */
 @Component({
