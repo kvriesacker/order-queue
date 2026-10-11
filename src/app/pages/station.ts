@@ -55,7 +55,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
         <h2>
           {{ config().title }} <span class="count">{{ waiting() }}</span>
         </h2>
-        <div class="kitchen-grid">
+        <div class="kitchen-grid" [class.one-column]="station() === 'kitchen'">
           @for (entry of active(); track entry.order.id) {
             <article class="order kitchen-order" [class]="entry.order.status">
               <header>
