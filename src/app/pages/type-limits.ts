@@ -3,8 +3,8 @@ import { typeSold } from '../models';
 import { QueueService } from '../queue.service';
 
 /**
- * For the kitchen: how many of each pizza are sold, an optional maximum per type (what the
- * ingredients allow) and a switch to mark a type sold out.
+ * For the kitchen: how many of each pizza can still be sold, to change as ingredients run
+ * low. The maximum follows: what's already sold plus what's left.
  */
 @Component({
   selector: 'app-type-limits',
@@ -13,42 +13,57 @@ import { QueueService } from '../queue.service';
       @for (t of types(); track t.name) {
         <li [class.out]="t.left === 0">
           <span class="type-name" [style.border-left-color]="t.color">{{ t.name }}</span>
-          <span class="type-count">
-            @if (t.soldOut) {
-              <strong>Sold out</strong>
-            } @else if (t.left !== null) {
-              <strong>{{ t.left }}</strong> left
-            }
-            <span class="muted">{{ t.sold }} sold</span>
-          </span>
-          <label class="type-max">
-            <span>Max</span>
+          <span class="type-count muted">{{ t.sold }} sold</span>
+          <span class="type-left-edit">
+            <button
+              class="btn small step"
+              type="button"
+              [disabled]="t.left === null || t.left === 0"
+              (click)="queue.setTypeLeft(t.name, t.left! - 1)"
+              [attr.aria-label]="'One less ' + t.name"
+            >
+              −
+            </button>
             <input
               type="number"
               min="0"
               max="99999"
               inputmode="numeric"
-              placeholder="–"
-              [value]="t.max || ''"
-              (change)="setMax(t.name, $any($event.target))"
-              [attr.aria-label]="'Maximum ' + t.name"
+              placeholder="No limit"
+              [value]="t.left ?? ''"
+              (change)="setLeft(t.name, $any($event.target))"
+              [attr.aria-label]="t.name + ' left'"
             />
-          </label>
-          <button
-            class="btn small"
-            type="button"
-            [class.danger]="!t.soldOut"
-            [attr.aria-pressed]="t.soldOut"
-            (click)="queue.setTypeLimit(t.name, { soldOut: !t.soldOut })"
-          >
-            {{ t.soldOut ? 'Available again' : 'Mark sold out' }}
-          </button>
+            <button
+              class="btn small step"
+              type="button"
+              [disabled]="t.left === null"
+              (click)="queue.setTypeLeft(t.name, t.left! + 1)"
+              [attr.aria-label]="'One more ' + t.name"
+            >
+              +
+            </button>
+          </span>
+          @if (t.left === 0) {
+            <strong class="type-out">Sold out</strong>
+          } @else {
+            <button class="btn small danger" type="button" (click)="queue.setTypeLeft(t.name, 0)">
+              Sold out
+            </button>
+          }
+          @if (t.left !== null) {
+            <button class="btn ghost small type-unlimited" type="button" (click)="queue.setTypeLeft(t.name, null)">
+              No limit
+            </button>
+          }
         </li>
       } @empty {
         <li class="muted">No pizzas on the menu.</li>
       }
     </ul>
-    <p class="muted small">Leave Max empty for no limit. Sold out stops new orders of that pizza.</p>
+    <p class="muted small">
+      Type how many you can still make, or leave it empty for no limit. 0 is sold out.
+    </p>
   `,
 })
 export class TypeLimits {
@@ -62,16 +77,13 @@ export class TypeLimits {
       .map((m) => ({
         name: m.name,
         color: m.color,
-        max: m.max ?? 0,
-        soldOut: !!m.soldOut,
         sold: typeSold(state, m.name),
         left: left.get(m.name) ?? null,
       }));
   });
 
-  setMax(name: string, input: HTMLInputElement) {
+  setLeft(name: string, input: HTMLInputElement) {
     const n = Number(input.value);
-    const max = input.value.trim() === '' || !(n > 0) ? 0 : Math.floor(n);
-    this.queue.setTypeLimit(name, { max });
+    this.queue.setTypeLeft(name, input.value.trim() === '' || !(n >= 0) ? null : Math.floor(n));
   }
 }

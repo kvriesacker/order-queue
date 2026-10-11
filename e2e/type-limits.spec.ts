@@ -41,7 +41,7 @@ test('a maximum set at the start stops orders of that pizza', async ({ page }) =
   await expect(pizza(page, 'Margherita')).toBeDisabled();
 });
 
-test('the kitchen changes a maximum and marks pizzas sold out', async ({ page }) => {
+test('the kitchen sets how many are left, and the maximum follows', async ({ page }) => {
   await page.goto(START);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
@@ -52,35 +52,46 @@ test('the kitchen changes a maximum and marks pizzas sold out', async ({ page })
   await tab(page, 'Kitchen').click();
   const panel = page.locator('.type-limits');
   const margherita = panel.locator('li', { hasText: 'Margherita' });
+  const left = margherita.getByLabel('Margherita left');
   await expect(margherita).toContainText('1 sold');
-  await margherita.getByLabel('Maximum Margherita').fill('3');
-  await margherita.getByLabel('Maximum Margherita').press('Enter');
-  await expect(margherita).toContainText('2 left');
+  await expect(left).toHaveValue('');
+  // The kitchen sees and edits what's left, never the maximum.
+  await expect(panel.getByText('Max')).toHaveCount(0);
+  await left.fill('3');
+  await left.press('Enter');
+  await expect(left).toHaveValue('3');
+  await margherita.getByRole('button', { name: 'One more Margherita' }).click();
+  await expect(left).toHaveValue('4');
+  await margherita.getByRole('button', { name: 'One less Margherita' }).click();
+  await margherita.getByRole('button', { name: 'One less Margherita' }).click();
+  await expect(left).toHaveValue('2');
   const funghi = panel.locator('li', { hasText: 'Funghi' });
-  await funghi.getByRole('button', { name: 'Mark sold out' }).click();
+  await funghi.getByRole('button', { name: 'Sold out' }).click();
   await expect(funghi).toHaveClass(/out/);
+  await expect(funghi.getByLabel('Funghi left')).toHaveValue('0');
 
   await tab(page, 'Orders').click();
   await expect(pizza(page, 'Margherita')).toContainText('2 left');
   await expect(pizza(page, 'Funghi')).toContainText('Sold out');
   await expect(pizza(page, 'Funghi')).toBeDisabled();
+  await pizza(page, 'Margherita').click();
+  await send(page);
 
-  // Settings shows the kitchen's maximum, and saving keeps the sold-out mark.
+  // Settings shows the maximum that follows: 2 sold + 1 left.
   await tab(page, 'Settings').click();
   await expect(page.getByLabel('Maximum Margherita')).toHaveValue('3');
-  await page.getByLabel('Maximum Margherita').fill('5');
-  await page.getByLabel('Maximum Margherita').blur();
-  await page.getByRole('button', { name: 'Save settings' }).click();
-  await expect(page.getByText('Saved.')).toBeVisible();
-  await tab(page, 'Orders').click();
-  await expect(pizza(page, 'Margherita')).toContainText('4 left');
-  await expect(pizza(page, 'Funghi')).toBeDisabled();
 
-  // Back on sale.
+  // New ingredients put Funghi back on sale; "No limit" lifts the limit on Margherita.
   await tab(page, 'Kitchen').click();
-  await funghi.getByRole('button', { name: 'Available again' }).click();
+  await expect(left).toHaveValue('1');
+  await funghi.getByLabel('Funghi left').fill('5');
+  await funghi.getByLabel('Funghi left').press('Enter');
+  await margherita.getByRole('button', { name: 'No limit' }).click();
+  await expect(left).toHaveValue('');
   await tab(page, 'Orders').click();
+  await expect(pizza(page, 'Funghi')).toContainText('5 left');
   await expect(pizza(page, 'Funghi')).toBeEnabled();
+  await expect(pizza(page, 'Margherita')).not.toContainText('left');
 
   // The kitchen panel fits on a phone.
   await tab(page, 'Kitchen').click();

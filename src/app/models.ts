@@ -141,6 +141,16 @@ export function typeLeft(state: QueueState, name: string): number | null {
   return item.max ? Math.max(0, item.max - typeSold(state, name)) : null;
 }
 
+/**
+ * The change that leaves `left` pizzas of a type to sell: the maximum becomes what's sold plus
+ * what's left. Nothing left marks it sold out, more puts it back on sale, null means no limit.
+ */
+export function leftChange(sold: number, left: number | null): { max: number; soldOut: boolean } {
+  if (left === null) return { max: 0, soldOut: false };
+  const n = Math.max(0, Math.min(MAX_PIZZAS, Math.floor(left)));
+  return { max: n > 0 ? sold + n : sold, soldOut: n === 0 };
+}
+
 /** Whether these pizzas fit under the total limit and each type's maximum. */
 export function canSell(state: QueueState, items: Pick<OrderItem, 'name' | 'qty'>[]): boolean {
   const left = pizzasLeft(state);
@@ -160,7 +170,7 @@ export type QueueAction =
   | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
   | { type: 'menu'; menu: MenuItem[] }
   | { type: 'timing'; timing: Timing }
-  /** The kitchen changes one pizza's maximum or marks it sold out, without touching the rest. */
+  /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
   | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean };
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {

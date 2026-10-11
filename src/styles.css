@@ -1384,26 +1384,41 @@ input.swatch {
   white-space: nowrap;
 }
 .type-count {
-  display: flex;
-  gap: 0.4rem;
-  align-items: baseline;
-  justify-content: flex-end;
-  font-size: 0.9rem;
-}
-.type-limits li.out .type-count strong {
-  color: var(--tomato-dark);
-}
-.type-max {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.4rem;
   font-size: 0.85rem;
+  text-align: right;
 }
-.type-max input {
-  width: 5rem;
-  padding: 0.3rem 0.45rem;
+.type-left-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.type-left-edit input {
+  width: 5.5rem;
+  padding: 0.3rem 0.4rem;
+  text-align: center;
+  font-weight: 700;
+}
+.type-left-edit .step {
+  min-width: 2rem;
+  padding-inline: 0.4rem;
+}
+.type-out {
+  color: var(--tomato-dark);
+  justify-self: end;
+}
+.type-limits li > .btn.danger {
+  justify-self: end;
+}
+.type-unlimited {
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 .muted.small {
   font-size: 0.85rem;
   margin-top: 0.5rem;
+}
+.type-left-edit input::placeholder {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--muted);
 }

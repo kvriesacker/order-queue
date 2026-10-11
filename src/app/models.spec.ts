@@ -1,6 +1,6 @@
 import {
   Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks,
-  pizzasLeft, typeLeft, typeSold,
+  leftChange, pizzasLeft, typeLeft, typeSold,
 } from './models';
 
 describe('applyAction', () => {
@@ -85,6 +85,26 @@ describe('applyAction', () => {
       s = applyAction(s, { type: 'type-limit', name: 'Margherita', soldOut: true });
       s = applyAction(s, { type: 'menu', menu: menu(6) });
       expect(s.menu[0]).toMatchObject({ max: 6, soldOut: true });
+    });
+
+    it('turns "left" from the kitchen into a maximum of sold plus left', () => {
+      let s: QueueState = { ...empty, menu: menu(0) };
+      s = applyAction(s, order('a', [['Margherita', 3]]));
+      const setLeft = (left: number | null) =>
+        applyAction(s, { type: 'type-limit', name: 'Margherita', ...leftChange(typeSold(s, 'Margherita'), left) });
+      s = setLeft(4);
+      expect(s.menu[0].max).toBe(7);
+      expect(typeLeft(s, 'Margherita')).toBe(4);
+      s = setLeft(0);
+      expect(typeLeft(s, 'Margherita')).toBe(0);
+      expect(s.menu[0].soldOut).toBe(true);
+      // More ingredients put it back on sale.
+      s = setLeft(2);
+      expect(s.menu[0]).toMatchObject({ max: 5, soldOut: false });
+      s = setLeft(null);
+      expect(typeLeft(s, 'Margherita')).toBeNull();
+      // Nothing sold yet and nothing left is still sold out, not "no limit".
+      expect(leftChange(0, 0)).toEqual({ max: 0, soldOut: true });
     });
 
     it('keeps counting pizzas from orders cleared from the list', () => {

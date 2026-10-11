@@ -13,6 +13,8 @@ import {
   outranks,
   pizzasLeft,
   typeLeft,
+  typeSold,
+  leftChange,
   randomId,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
@@ -238,6 +240,17 @@ export class QueueService {
   /** Changes one pizza type's maximum or sold-out mark; anyone on staff (the kitchen) may. */
   setTypeLimit(name: string, change: { max?: number; soldOut?: boolean }): void {
     this.dispatch({ type: 'type-limit', name, ...change });
+  }
+
+  /** Sets how many of one pizza can still be sold (null: no limit), as the kitchen sees it. */
+  setTypeLeft(name: string, left: number | null): void {
+    const state = this.state();
+    if (!state) return;
+    // This device's unsent orders will count as sold too.
+    const unsent = this.pending()
+      .flatMap((a) => (a.type === 'add' ? a.items : []))
+      .reduce((n, i) => n + (i.name === name ? i.qty : 0), 0);
+    this.setTypeLimit(name, leftChange(typeSold(state, name) + unsent, left));
   }
 
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
