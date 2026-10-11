@@ -658,7 +658,7 @@ input.swatch {
 /* Kitchen */
 .kitchen {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 1.2rem;
   align-items: start;
 }
@@ -1328,4 +1328,82 @@ input.swatch {
   .bars li {
     grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr) 4.8rem;
   }
+}
+
+/* Per-pizza maximum */
+.menu-editor .item-max {
+  width: 4.8rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.5rem;
+}
+.menu-editor .check {
+  min-width: 0;
+}
+.menu-editor .check input {
+  flex-shrink: 0;
+}
+.menu-item .type-left {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted, #7a6a5e);
+}
+.menu-item.sold-out .type-left {
+  color: var(--tomato-dark);
+}
+.types-head {
+  margin-top: 1.4rem;
+}
+.type-limits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.type-limits li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.type-limits li.out {
+  background: #fdeceb;
+}
+.type-name {
+  font-weight: 700;
+  border-left: 6px solid;
+  padding-left: 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.type-count {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  justify-content: flex-end;
+  font-size: 0.9rem;
+}
+.type-limits li.out .type-count strong {
+  color: var(--tomato-dark);
+}
+.type-max {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+.type-max input {
+  width: 5rem;
+  padding: 0.3rem 0.45rem;
+}
+.muted.small {
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 }

@@ -1,4 +1,7 @@
-import { Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks, pizzasLeft } from './models';
+import {
+  Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks,
+  pizzasLeft, typeLeft, typeSold,
+} from './models';
 
 describe('applyAction', () => {
   const empty: QueueState = {
@@ -9,6 +12,7 @@ describe('applyAction', () => {
     timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
     orders: [],
     soldCleared: 0,
+    soldClearedByType: {},
     hostEpoch: 0,
     hostId: '',
   };
@@ -30,6 +34,68 @@ describe('applyAction', () => {
   it('ignores a duplicate add, such as a resent action', () => {
     const once = applyAction(empty, add('a'));
     expect(applyAction(once, add('a'))).toBe(once);
+  });
+
+  describe('maximum per pizza type', () => {
+    const menu = (max: number, soldOut = false) => [
+      { name: 'Margherita', color: '#e53935', enabled: true, max, soldOut },
+      { name: 'Funghi', color: '#6d4c41', enabled: true },
+    ];
+    const order = (id: string, items: [string, number][]): QueueAction => ({
+      type: 'add', id, customer: '', note: '',
+      items: items.map(([name, qty]) => ({ name, qty, note: '', color: '#000000' })),
+    });
+
+    it('never sells more of a type than its maximum, counted over every line', () => {
+      let s: QueueState = { ...empty, menu: menu(3) };
+      s = applyAction(s, order('a', [['Margherita', 2]]));
+      expect(typeLeft(s, 'Margherita')).toBe(1);
+      expect(typeLeft(s, 'Funghi')).toBeNull();
+      // Two lines of one Margherita each are still two.
+      expect(applyAction(s, order('b', [['Margherita', 1], ['Margherita', 1]]))).toBe(s);
+      // Other types aren't held back.
+      s = applyAction(s, order('b', [['Margherita', 1], ['Funghi', 5]]));
+      expect(typeLeft(s, 'Margherita')).toBe(0);
+      expect(typeSold(s, 'Funghi')).toBe(5);
+      // Cancelling frees them; bringing the order back needs room again.
+      s = applyAction(s, { type: 'status', id: 'a', status: 'cancelled' });
+      expect(typeLeft(s, 'Margherita')).toBe(2);
+      s = applyAction(s, order('c', [['Margherita', 2]]));
+      expect(applyAction(s, { type: 'status', id: 'a', status: 'new' })).toBe(s);
+    });
+
+    it('works alongside the total limit', () => {
+      let s: QueueState = { ...empty, menu: menu(10), timing: { ...empty.timing, maxPizzas: 3 } };
+      expect(applyAction(s, order('a', [['Margherita', 4]]))).toBe(s);
+      s = applyAction(s, order('a', [['Margherita', 3]]));
+      expect(pizzasLeft(s)).toBe(0);
+    });
+
+    it('lets the kitchen mark a type sold out and change its maximum', () => {
+      let s: QueueState = { ...empty, menu: menu(0) };
+      s = applyAction(s, { type: 'type-limit', name: 'Margherita', soldOut: true });
+      expect(typeLeft(s, 'Margherita')).toBe(0);
+      expect(applyAction(s, order('a', [['Margherita', 1]]))).toBe(s);
+      s = applyAction(s, { type: 'type-limit', name: 'Margherita', soldOut: false, max: 4 });
+      expect(typeLeft(s, 'Margherita')).toBe(4);
+      // Unknown pizzas and no-op changes leave the queue alone.
+      expect(applyAction(s, { type: 'type-limit', name: 'Nope', max: 2 })).toBe(s);
+      expect(applyAction(s, { type: 'type-limit', name: 'Margherita', max: 4 })).toBe(s);
+      // A Settings save keeps the kitchen's sold-out mark.
+      s = applyAction(s, { type: 'type-limit', name: 'Margherita', soldOut: true });
+      s = applyAction(s, { type: 'menu', menu: menu(6) });
+      expect(s.menu[0]).toMatchObject({ max: 6, soldOut: true });
+    });
+
+    it('keeps counting pizzas from orders cleared from the list', () => {
+      let s: QueueState = { ...empty, menu: menu(200) };
+      for (let i = 0; i < 105; i++) {
+        s = applyAction(s, order('o' + i, [['Margherita', 1]]));
+        s = applyAction(s, { type: 'status', id: 'o' + i, status: 'collected' });
+      }
+      expect(s.orders.length).toBe(100);
+      expect(typeSold(s, 'Margherita')).toBe(105);
+    });
   });
 
   it('never sells more pizzas than the limit', () => {

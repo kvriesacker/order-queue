@@ -11,6 +11,10 @@ export interface MenuItem {
   /** Hex color, so the kitchen can tell pizzas apart at a glance. */
   color: string;
   enabled: boolean;
+  /** How many of this pizza can be made (ingredients); 0 or missing means no limit. */
+  max?: number;
+  /** Marked sold out by hand, for example when an ingredient runs out early. */
+  soldOut?: boolean;
 }
 
 export interface OrderItem {
@@ -56,6 +60,8 @@ export interface QueueState {
   orders: Order[];
   /** Pizzas in picked-up orders that were cleared from the list, so they still count as sold. */
   soldCleared: number;
+  /** The same per pizza type, for the per-type maximum. */
+  soldClearedByType: Record<string, number>;
   /** Goes up by one each time another device takes over as host. */
   hostEpoch: number;
   /** Identifies the device hosting this epoch (a random id it keeps with its saved queue). */
@@ -116,12 +122,46 @@ export function pizzasLeft(state: QueueState): number | null {
   return max > 0 ? Math.max(0, max - pizzasSold(state)) : null;
 }
 
+/** Pizzas of one type sold so far: every order except cancelled ones. */
+export function typeSold(state: QueueState, name: string): number {
+  const inList = state.orders
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + o.items.reduce((n, i) => n + (i.name === name ? i.qty : 0), 0), 0);
+  return inList + (state.soldClearedByType[name] ?? 0);
+}
+
+/**
+ * How many pizzas of one type can still be sold: 0 when marked sold out, null when the type
+ * has no maximum (the total limit still applies) or isn't on the menu.
+ */
+export function typeLeft(state: QueueState, name: string): number | null {
+  const item = state.menu.find((m) => m.name === name);
+  if (!item) return null;
+  if (item.soldOut) return 0;
+  return item.max ? Math.max(0, item.max - typeSold(state, name)) : null;
+}
+
+/** Whether these pizzas fit under the total limit and each type's maximum. */
+export function canSell(state: QueueState, items: Pick<OrderItem, 'name' | 'qty'>[]): boolean {
+  const left = pizzasLeft(state);
+  if (left !== null && items.reduce((n, i) => n + i.qty, 0) > left) return false;
+  const perType = new Map<string, number>();
+  for (const i of items) perType.set(i.name, (perType.get(i.name) ?? 0) + i.qty);
+  for (const [name, qty] of perType) {
+    const typeLeftNow = typeLeft(state, name);
+    if (typeLeftNow !== null && qty > typeLeftNow) return false;
+  }
+  return true;
+}
+
 export type QueueAction =
   | { type: 'add'; id: string; customer: string; items: NewOrderItem[]; note: string }
   | { type: 'status'; id: string; status: OrderStatus }
   | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
   | { type: 'menu'; menu: MenuItem[] }
-  | { type: 'timing'; timing: Timing };
+  | { type: 'timing'; timing: Timing }
+  /** The kitchen changes one pizza's maximum or marks it sold out, without touching the rest. */
+  | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean };
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
@@ -169,9 +209,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           };
         });
       if (!items.length) return state;
-      // Never sell more pizzas than can be made.
-      const left = pizzasLeft(state);
-      if (left !== null && items.reduce((n, i) => n + i.qty, 0) > left) return state;
+      // Never sell more pizzas than can be made, in total or of one type.
+      if (!canSell(state, items)) return state;
       const order: Order = {
         id: action.id,
         number: state.nextNumber,
@@ -189,9 +228,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       if (!target || target.status === action.status || !(action.status in STATUS_LABELS))
         return state;
       // Bringing back a cancelled order sells its pizzas again, so it needs room.
-      const left = pizzasLeft(state);
-      const qty = target.items.reduce((n, i) => n + i.qty, 0);
-      if (target.status === 'cancelled' && left !== null && qty > left) return state;
+      if (target.status === 'cancelled' && !canSell(state, target.items)) return state;
       return updateOrder(state, action.id, (o) => {
         let items = o.items;
         // Moving a whole order back into the kitchen (undo at the counter) or forward
@@ -252,8 +289,21 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           name: m.name.trim().slice(0, 40),
           color: isColor(m.color) ? m.color : OTHER_COLOR,
           enabled: !!m.enabled,
+          max: typeMax(m.max),
+          // Sold out is the kitchen's call, so a Settings save keeps what the kitchen set.
+          soldOut: !!state.menu.find((old) => old.name === m.name.trim())?.soldOut,
         }));
       return { ...state, menu };
+    }
+    case 'type-limit': {
+      const index = state.menu.findIndex((m) => m.name === action.name);
+      if (index < 0) return state;
+      const item = { ...state.menu[index] };
+      if (action.max !== undefined) item.max = typeMax(action.max);
+      if (action.soldOut !== undefined) item.soldOut = !!action.soldOut;
+      if (item.max === state.menu[index].max && item.soldOut === state.menu[index].soldOut)
+        return state;
+      return { ...state, menu: state.menu.map((m, i) => (i === index ? item : m)) };
     }
   }
 }
@@ -283,6 +333,11 @@ export function displayStage(order: Order): DisplayStage | null {
   return 'ordered';
 }
 
+/** A valid per-type maximum: a whole number, 0 meaning no limit. */
+function typeMax(n: unknown): number {
+  return typeof n === 'number' && n > 0 && n <= MAX_PIZZAS ? Math.floor(n) : 0;
+}
+
 /** Records when a pizza reached a step; going back clears the later steps. */
 function stampTimes(times: PizzaTimes, status: PizzaStatus, now: number): PizzaTimes {
   if (status === 'new') return {};
@@ -308,7 +363,11 @@ const LEGACY_UNITS: Record<string, PizzaStatus> = {
 
 /** Upgrades a queue saved by an older version of the app (no menu, no per-pizza tracking). */
 export function normalizeState(state: QueueState): QueueState {
-  const menu = Array.isArray(state.menu) ? state.menu : DEFAULT_MENU.map((m) => ({ ...m }));
+  const menu = (Array.isArray(state.menu) ? state.menu : DEFAULT_MENU).map((m) => ({
+    ...m,
+    max: typeMax(m.max),
+    soldOut: !!m.soldOut,
+  }));
   // Queues from before the three phases had a different timing shape; start fresh.
   const timing = TIMING_KEYS.every((k) => (state.timing?.[k] ?? 0) > 0)
     ? { ...state.timing }
@@ -335,9 +394,15 @@ export function normalizeState(state: QueueState): QueueState {
   });
   const { id, name, nextNumber } = state;
   const soldCleared = state.soldCleared >= 0 ? state.soldCleared : 0;
+  const soldClearedByType =
+    state.soldClearedByType && typeof state.soldClearedByType === 'object'
+      ? state.soldClearedByType
+      : {};
   const hostEpoch = state.hostEpoch >= 0 ? state.hostEpoch : 0;
   const hostId = typeof state.hostId === 'string' ? state.hostId : '';
-  return { id, name, nextNumber, menu, timing, orders, soldCleared, hostEpoch, hostId };
+  return {
+    id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, hostEpoch, hostId,
+  };
 }
 
 /** Black or white, whichever reads better on the given background color. */
@@ -363,13 +428,15 @@ function trimFinished(state: QueueState, orders: Order[]): QueueState {
     .sort((a, b) => a.updatedAt - b.updatedAt)
     .slice(0, finished.length - MAX_FINISHED);
   const ids = new Set(dropped.map((o) => o.id));
-  const sold = dropped
-    .filter((o) => o.status === 'collected')
-    .reduce((sum, o) => sum + o.items.reduce((n, i) => n + i.qty, 0), 0);
+  const collected = dropped.filter((o) => o.status === 'collected').flatMap((o) => o.items);
+  const sold = collected.reduce((n, i) => n + i.qty, 0);
+  const soldClearedByType = { ...state.soldClearedByType };
+  for (const i of collected) soldClearedByType[i.name] = (soldClearedByType[i.name] ?? 0) + i.qty;
   return {
     ...state,
     orders: orders.filter((o) => !ids.has(o.id)),
     soldCleared: state.soldCleared + sold,
+    soldClearedByType,
   };
 }
 

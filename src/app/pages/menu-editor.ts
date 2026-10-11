@@ -2,7 +2,7 @@ import { Component, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MenuItem } from '../models';
 
-/** Check pizzas on or off, pick their colors and add new ones. */
+/** Check pizzas on or off, set an optional maximum per pizza, pick colors and add new ones. */
 @Component({
   selector: 'app-menu-editor',
   imports: [FormsModule],
@@ -18,6 +18,18 @@ import { MenuItem } from '../models';
             />
             <span class="name">{{ item.name }}</span>
           </label>
+          <input
+            type="number"
+            class="item-max"
+            min="0"
+            max="99999"
+            inputmode="numeric"
+            placeholder="Max"
+            title="How many of this pizza can be made (empty: no limit)"
+            [value]="item.max || ''"
+            (change)="update($index, { max: maxFrom($any($event.target).value) })"
+            [attr.aria-label]="'Maximum ' + item.name"
+          />
           <input
             type="color"
             class="swatch"
@@ -54,6 +66,7 @@ import { MenuItem } from '../models';
       />
       <button class="btn" type="button" [disabled]="!newName.trim()" (click)="add()">Add</button>
     </div>
+    <p class="muted small">Max: how many of a pizza the ingredients allow. Leave empty for no limit.</p>
     @if (duplicate()) {
       <p class="error">That pizza is already on the list.</p>
     }
@@ -67,6 +80,11 @@ export class MenuEditor {
 
   update(index: number, change: Partial<MenuItem>) {
     this.menu.update((menu) => menu.map((m, i) => (i === index ? { ...m, ...change } : m)));
+  }
+
+  protected maxFrom(value: string): number {
+    const n = Number(value);
+    return value.trim() && n > 0 ? Math.floor(n) : 0;
   }
 
   remove(index: number) {

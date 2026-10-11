@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { Order, PizzaStatus, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
+import { TypeLimits } from './type-limits';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -44,7 +45,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta],
+  imports: [Eta, TypeLimits],
   template: `
     <main class="page kitchen">
       <section class="column">
@@ -123,6 +124,8 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
           } @empty {
             <p class="muted">None.</p>
           }
+          <h2 class="types-head">Pizzas left</h2>
+          <app-type-limits />
         } @else {
           <h2>
             Baked, waiting at counter <span class="count">{{ baked().length }}</span>

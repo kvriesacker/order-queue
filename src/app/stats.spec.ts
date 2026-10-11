@@ -13,6 +13,7 @@ function queue(maxPizzas = 0): QueueState {
     timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas },
     orders: [],
     soldCleared: 0,
+    soldClearedByType: {},
     hostEpoch: 0,
     hostId: '',
   };

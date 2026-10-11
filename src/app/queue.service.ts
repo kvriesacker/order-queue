@@ -12,6 +12,7 @@ import {
   normalizeState,
   outranks,
   pizzasLeft,
+  typeLeft,
   randomId,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
@@ -80,6 +81,22 @@ export class QueueService {
       .reduce((n, a) => n + a.items.reduce((m, i) => m + i.qty, 0), 0);
     return Math.max(0, left - unsent);
   });
+  /**
+   * Pizzas of each menu type that can still be sold, counting this device's unsent orders:
+   * 0 when sold out, null when the type has no maximum.
+   */
+  readonly typeLeft = computed(() => {
+    const state = this.state();
+    const left = new Map<string, number | null>();
+    if (!state) return left;
+    const unsent = this.pending().flatMap((a) => (a.type === 'add' ? a.items : []));
+    for (const m of state.menu) {
+      const n = typeLeft(state, m.name);
+      const mine = unsent.reduce((sum, i) => sum + (i.name === m.name ? i.qty : 0), 0);
+      left.set(m.name, n === null ? null : Math.max(0, n - mine));
+    }
+    return left;
+  });
   /** Estimated ready time per open order id; refreshes as the clock ticks. */
   readonly estimates = computed(() => {
     const state = this.state();
@@ -127,6 +144,7 @@ export class QueueService {
       timing,
       orders: [],
       soldCleared: 0,
+      soldClearedByType: {},
       hostEpoch: 0,
       hostId: randomId(12),
     };
@@ -215,6 +233,11 @@ export class QueueService {
 
   setTiming(timing: Timing): void {
     if (this.isHost()) this.applyAsHost({ type: 'timing', timing });
+  }
+
+  /** Changes one pizza type's maximum or sold-out mark; anyone on staff (the kitchen) may. */
+  setTypeLimit(name: string, change: { max?: number; soldOut?: boolean }): void {
+    this.dispatch({ type: 'type-limit', name, ...change });
   }
 
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
@@ -619,6 +642,14 @@ interface Claim {
 
 function isReflected(state: QueueState, action: QueueAction): boolean {
   if (action.type === 'menu' || action.type === 'timing') return true;
+  if (action.type === 'type-limit') {
+    const item = state.menu.find((m) => m.name === action.name);
+    return (
+      !item ||
+      ((action.max === undefined || (item.max ?? 0) === action.max) &&
+        (action.soldOut === undefined || !!item.soldOut === action.soldOut))
+    );
+  }
   const order = state.orders.find((o) => o.id === action.id);
   if (action.type === 'add') return !!order;
   if (action.type === 'pizza') {

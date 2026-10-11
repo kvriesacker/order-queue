@@ -35,14 +35,21 @@ import { OrderCard } from './order-card';
         }
         <div class="menu">
           @for (pizza of menu(); track pizza.name) {
+            @let typeLeft = typeLeftAfterCart(pizza.name);
             <button
               class="menu-item"
               type="button"
               [style.border-left-color]="pizza.color"
-              [disabled]="!canAdd()"
+              [class.sold-out]="typeLeft === 0"
+              [disabled]="!canAdd() || typeLeft === 0"
               (click)="add(pizza.name, pizza.color)"
             >
               {{ pizza.name }}
+              @if (queue.typeLeft().get(pizza.name) === 0) {
+                <small class="type-left">Sold out</small>
+              } @else if (typeLeft !== null) {
+                <small class="type-left">{{ typeLeft }} left</small>
+              }
             </button>
           }
         </div>
@@ -61,7 +68,7 @@ import { OrderCard } from './order-card';
                   <button
                     class="btn ghost small"
                     type="button"
-                    [disabled]="!canAdd()"
+                    [disabled]="!canAdd() || typeLeftAfterCart(line.name) === 0"
                     (click)="duplicate(i)"
                     aria-label="Add another one"
                   >
@@ -118,7 +125,18 @@ import { OrderCard } from './order-card';
             />
           </label>
         </div>
-        <button class="btn primary big" type="button" [disabled]="!cart().length || overLimit()" (click)="send()">
+        @for (t of overType(); track t.name) {
+          <p class="left-note low">
+            Only <strong>{{ t.left }}</strong> {{ t.name }} left. Remove {{ t.over }} from this
+            order to send it.
+          </p>
+        }
+        <button
+          class="btn primary big"
+          type="button"
+          [disabled]="!cart().length || overLimit() || overType().length"
+          (click)="send()"
+        >
           Send to kitchen
         </button>
         @if (refused()) {
@@ -197,6 +215,21 @@ export class Take {
     const left = this.left();
     return left !== null && this.cart().length > left;
   });
+  /** How many more of a menu pizza can go in this order (null: no maximum for that type). */
+  protected typeLeftAfterCart(name: string): number | null {
+    const left = this.queue.typeLeft().get(name);
+    if (left === null || left === undefined) return null;
+    return Math.max(0, left - this.cart().filter((l) => l.name === name).length);
+  }
+  /** Pizza types in this order that go over what's left of them (someone else sold them). */
+  protected overType = computed(() => {
+    const counts = new Map<string, number>();
+    for (const l of this.cart()) counts.set(l.name, (counts.get(l.name) ?? 0) + 1);
+    return [...counts]
+      .map(([name, qty]) => ({ name, qty, left: this.queue.typeLeft().get(name) }))
+      .filter((t): t is { name: string; qty: number; left: number } => t.left != null && t.qty > t.left)
+      .map((t) => ({ name: t.name, left: t.left, over: t.qty - t.left }));
+  });
   /** The order just sent was refused because another order took the last pizzas. */
   protected refused = computed(() => this.queue.refused().has(this.lastId()));
   protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
@@ -248,7 +281,7 @@ export class Take {
   }
 
   send() {
-    if (this.overLimit()) return;
+    if (this.overLimit() || this.overType().length) return;
     const cart = this.cart();
     const id = this.queue.addOrder(this.customer, cart, this.note);
     this.lastId.set(id);
