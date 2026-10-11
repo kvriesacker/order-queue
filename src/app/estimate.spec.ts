@@ -14,6 +14,7 @@ function queue(): QueueState {
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},
+    ovensOut: [],
     hostEpoch: 0,
     hostId: '',
   };
@@ -76,6 +77,22 @@ describe('estimateReady', () => {
     const more = applyAction(s, { type: 'timing', timing: { ...s.timing, ovens: 3 } });
     // Three ovens: baked at 9, 10, 11, called at 13.
     expect(estimateReady(more, T0).get('a')).toBe(T0 + 13 * MIN);
+  });
+
+  it('leaves ovens marked out of order out of the estimate', () => {
+    const base = queue();
+    base.timing = { ...base.timing, prepareMinutes: 1, ovens: 3, pizzasPerOven: 1 };
+    let s = order(base, 'a', 3, T0);
+    expect(estimateReady(s, T0).get('a')).toBe(T0 + 13 * MIN);
+    // Two of three ovens out: one at a time again, as with a single oven.
+    s = applyAction(s, { type: 'oven', index: 0, out: true });
+    s = applyAction(s, { type: 'oven', index: 2, out: true });
+    expect(estimateReady(s, T0).get('a')).toBe(T0 + 27 * MIN);
+    // Every oven out: no estimate until one works again.
+    s = applyAction(s, { type: 'oven', index: 1, out: true });
+    expect(estimateReady(s, T0).has('a')).toBe(false);
+    s = applyAction(s, { type: 'oven', index: 1, out: false });
+    expect(estimateReady(s, T0).get('a')).toBe(T0 + 27 * MIN);
   });
 
   it('ignores bake times of pizzas that waited for a full oven', () => {

@@ -1464,3 +1464,64 @@ input.swatch {
   font-size: 0.75rem;
   white-space: nowrap;
 }
+
+/* Oven station: the ovens */
+.ovens-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
+}
+.oven {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 6px solid var(--crust);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+}
+.oven.full {
+  border-top-color: var(--tomato);
+}
+.oven.broken {
+  border-top-color: #8a8a8a;
+  background: #f1eeec;
+}
+.oven header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.oven header strong {
+  font-size: 1.15rem;
+}
+.oven-count {
+  font-weight: 700;
+  color: var(--muted);
+}
+.oven.broken .oven-count {
+  color: var(--tomato-dark);
+}
+.oven-pizzas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.oven-pizzas .chip {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+}
+.oven > .btn {
+  align-self: flex-start;
+}
+.oven-waiting {
+  font-weight: 600;
+  color: var(--tomato-dark);
+  margin: 0 0 1rem;
+}

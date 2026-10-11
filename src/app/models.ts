@@ -62,6 +62,8 @@ export interface QueueState {
   soldCleared: number;
   /** The same per pizza type, for the per-type maximum. */
   soldClearedByType: Record<string, number>;
+  /** Ovens marked out of order by the oven station (0 is the first oven). */
+  ovensOut: number[];
   /** Goes up by one each time another device takes over as host. */
   hostEpoch: number;
   /** Identifies the device hosting this epoch (a random id it keeps with its saved queue). */
@@ -191,6 +193,8 @@ export type QueueAction =
   | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
   | { type: 'menu'; menu: MenuItem[] }
   | { type: 'timing'; timing: Timing }
+  /** The oven station marks one oven out of order, or working again. */
+  | { type: 'oven'; index: number; out: boolean }
   /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
   | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean };
 
@@ -310,7 +314,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       for (const key of OVEN_KEYS) timing[key] = count(action.timing[key], timing[key]);
       const max = action.timing.maxPizzas;
       if (typeof max === 'number' && max >= 0 && max <= MAX_PIZZAS) timing.maxPizzas = Math.floor(max);
-      return { ...state, timing };
+      return { ...state, timing, ovensOut: state.ovensOut.filter((i) => i < timing.ovens) };
     }
     case 'menu': {
       const menu = action.menu
@@ -325,6 +329,15 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           soldOut: !!state.menu.find((old) => old.name === m.name.trim())?.soldOut,
         }));
       return { ...state, menu };
+    }
+    case 'oven': {
+      const { index, out } = action;
+      if (!Number.isInteger(index) || index < 0 || index >= state.timing.ovens) return state;
+      if (state.ovensOut.includes(index) === !!out) return state;
+      const ovensOut = out
+        ? [...state.ovensOut, index].sort((a, b) => a - b)
+        : state.ovensOut.filter((i) => i !== index);
+      return { ...state, ovensOut };
     }
     case 'type-limit': {
       const index = state.menu.findIndex((m) => m.name === action.name);
@@ -429,10 +442,14 @@ export function normalizeState(state: QueueState): QueueState {
     state.soldClearedByType && typeof state.soldClearedByType === 'object'
       ? state.soldClearedByType
       : {};
+  const ovensOut = Array.isArray(state.ovensOut)
+    ? state.ovensOut.filter((i) => Number.isInteger(i) && i >= 0 && i < timing.ovens)
+    : [];
   const hostEpoch = state.hostEpoch >= 0 ? state.hostEpoch : 0;
   const hostId = typeof state.hostId === 'string' ? state.hostId : '';
   return {
-    id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, hostEpoch, hostId,
+    id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, ovensOut,
+    hostEpoch, hostId,
   };
 }
 

@@ -14,6 +14,7 @@ function queue(maxPizzas = 0): QueueState {
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},
+    ovensOut: [],
     hostEpoch: 0,
     hostId: '',
   };

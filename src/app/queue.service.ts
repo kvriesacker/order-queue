@@ -147,6 +147,7 @@ export class QueueService {
       orders: [],
       soldCleared: 0,
       soldClearedByType: {},
+      ovensOut: [],
       hostEpoch: 0,
       hostId: randomId(12),
     };
@@ -249,6 +250,11 @@ export class QueueService {
   setTypeLeft(name: string, left: number | null): void {
     const state = this.state();
     if (state) this.setTypeLimit(name, leftChange(typeMade(state, name), left));
+  }
+
+  /** Marks one oven out of order (or working again); the oven station may. */
+  setOvenOut(index: number, out: boolean): void {
+    this.dispatch({ type: 'oven', index, out });
   }
 
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
@@ -653,6 +659,8 @@ interface Claim {
 
 function isReflected(state: QueueState, action: QueueAction): boolean {
   if (action.type === 'menu' || action.type === 'timing') return true;
+  if (action.type === 'oven')
+    return action.index >= state.timing.ovens || state.ovensOut.includes(action.index) === action.out;
   if (action.type === 'type-limit') {
     const item = state.menu.find((m) => m.name === action.name);
     return (

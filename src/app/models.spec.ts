@@ -13,6 +13,7 @@ describe('applyAction', () => {
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},
+    ovensOut: [],
     hostEpoch: 0,
     hostId: '',
   };
@@ -34,6 +35,21 @@ describe('applyAction', () => {
   it('ignores a duplicate add, such as a resent action', () => {
     const once = applyAction(empty, add('a'));
     expect(applyAction(once, add('a'))).toBe(once);
+  });
+
+  it('marks ovens out of order and keeps them within the number of ovens', () => {
+    let s: QueueState = { ...empty, timing: { ...empty.timing, ovens: 3 } };
+    s = applyAction(s, { type: 'oven', index: 2, out: true });
+    s = applyAction(s, { type: 'oven', index: 0, out: true });
+    expect(s.ovensOut).toEqual([0, 2]);
+    expect(applyAction(s, { type: 'oven', index: 0, out: true })).toBe(s);
+    expect(applyAction(s, { type: 'oven', index: 3, out: true })).toBe(s);
+    s = applyAction(s, { type: 'oven', index: 0, out: false });
+    expect(s.ovensOut).toEqual([2]);
+    // Fewer ovens in Settings drops the ones that are gone.
+    s = applyAction(s, { type: 'timing', timing: { ...s.timing, ovens: 2 } });
+    expect(s.ovensOut).toEqual([]);
+    expect(normalizeState({ ...s, ovensOut: undefined } as unknown as QueueState).ovensOut).toEqual([]);
   });
 
   describe('maximum per pizza type', () => {

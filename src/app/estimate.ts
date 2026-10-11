@@ -62,9 +62,10 @@ function blend(samples: number[], setting: number): number {
   return Math.max(MINUTE / 6, measured * weight + setting * (1 - weight));
 }
 
-/** How many pizzas fit in the ovens at once. */
+/** How many pizzas fit at once in the ovens that work (0 when every oven is out of order). */
 export function ovenSlots(state: QueueState): number {
-  return Math.max(1, state.timing.ovens * state.timing.pizzasPerOven);
+  const working = state.timing.ovens - state.ovensOut.length;
+  return Math.max(0, working) * state.timing.pizzasPerOven;
 }
 
 /**
@@ -72,7 +73,7 @@ export function ovenSlots(state: QueueState): number {
  *
  * The kitchen prepares pizzas one after another in order of arrival. Each prepared pizza
  * then goes into the first oven spot that frees up (the host sets how many ovens and how
- * many pizzas fit in each) and bakes for the bake time. When an order's last pizza is
+ * many pizzas fit in each; ovens marked out of order don't count) and bakes for the bake time. When an order's last pizza is
  * baked, the counter needs its own time to call it. Each phase uses {@link phaseTimes},
  * and anything running late is pushed to "now", so the estimates keep moving with reality.
  */
@@ -112,9 +113,11 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
     }
   }
 
-  // Fill the oven spots in the order pizzas come out of the kitchen.
+  // Fill the oven spots in the order pizzas come out of the kitchen. With every oven out of
+  // order, orders that still need the oven have no estimate until one works again.
   const free = Array<number>(ovenSlots(state)).fill(0);
-  for (const pizza of forOven.sort((a, b) => a.from - b.from)) {
+  if (!free.length) for (const pizza of forOven) lastBaked.delete(pizza.order);
+  for (const pizza of free.length ? forOven.sort((a, b) => a.from - b.from) : []) {
     const spot = free.indexOf(Math.min(...free));
     const baked = Math.max(now, Math.max(pizza.from, free[spot]) + bake);
     free[spot] = baked;

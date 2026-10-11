@@ -267,6 +267,7 @@ const EMPTY_STATE = {
   orders: [],
   soldCleared: 0,
   soldClearedByType: {},
+  ovensOut: [],
   hostEpoch: 0,
   hostId: '',
 };

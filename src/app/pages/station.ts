@@ -3,6 +3,7 @@ import { Order, PizzaStatus, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { TypeLimits } from './type-limits';
+import { Ovens } from './ovens';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -47,10 +48,14 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta, TypeLimits],
+  imports: [Eta, TypeLimits, Ovens],
   template: `
     <main class="page kitchen">
       <section class="column">
+        @if (station() === 'oven') {
+          <h2>Ovens</h2>
+          <app-ovens />
+        }
         <h2>
           {{ config().title }} <span class="count">{{ waiting() }}</span>
         </h2>
