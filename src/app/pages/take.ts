@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NewOrderItem, OTHER_COLOR } from '../models';
+import { NewOrderItem, OTHER_COLOR, randomId } from '../models';
 
 const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
@@ -113,7 +113,12 @@ import { OrderCard } from './order-card';
         <div class="grid2">
           <label>
             <span>Customer name <span class="muted">(optional)</span></span>
-            <input name="customer" [(ngModel)]="customer" maxlength="40" />
+            <input
+              name="customer"
+              [ngModel]="customer()"
+              (ngModelChange)="customer.set($event)"
+              maxlength="40"
+            />
           </label>
           <label>
             <span>Order note <span class="muted">(optional)</span></span>
@@ -151,6 +156,11 @@ import { OrderCard } from './order-card';
               <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
             }
           </p>
+          @if (!cart().length) {
+            <button class="btn qr-again" type="button" (click)="showQr.set(!showQr())">
+              {{ showQr() ? 'Hide QR code' : 'Show QR code again' }}
+            </button>
+          }
         } @else if (lastId()) {
           <p class="sent pending">Sending order…</p>
         }
@@ -177,7 +187,13 @@ export class Take {
   protected cart = signal<NewOrderItem[]>([]);
   protected quickNotes = QUICK_NOTES;
   protected custom = '';
-  protected customer = '';
+  protected customer = signal('');
+  /** This order point, so its customer screen follows only this tab. */
+  private pos = orderPoint();
+  /** The id the order being taken will get, so the customer can scan its QR code early. */
+  private draftId = signal(randomId(10));
+  /** Show the QR code of the order just sent on the customer screen again. */
+  protected showQr = signal(false);
   protected note = '';
   /** The id of the order just sent, so we can show its number once the host assigns it. */
   protected lastId = signal('');
@@ -192,6 +208,20 @@ export class Take {
   private lastCart: { cart: NewOrderItem[]; customer: string; note: string } | null = null;
 
   constructor() {
+    // The customer screen follows the order as it's taken.
+    effect(() => {
+      // Sent again once connected, so a screen that opens later still gets it.
+      this.queue.connection();
+      this.queue.publishDraft({
+        pos: this.pos,
+        orderId: this.draftId(),
+        customer: this.customer().trim(),
+        pizzas: this.cart().map((l) => ({ name: l.name, color: l.color })),
+        sentId: this.lastId(),
+        showQr: this.showQr(),
+        at: Date.now(),
+      });
+    });
     // Put a refused order back so it can be fixed and sent again.
     effect(() => {
       if (!this.refused() || !this.lastCart) return;
@@ -199,7 +229,7 @@ export class Take {
       this.lastCart = null;
       untracked(() => {
         this.cart.set(last.cart);
-        this.customer = last.customer;
+        this.customer.set(last.customer);
         this.note = last.note;
       });
     });
@@ -235,7 +265,9 @@ export class Take {
   protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
   protected clock = clockTime;
   /** The screen facing the customer while ordering, best opened on a second display. */
-  protected screenLink = computed(() => this.queue.shareLink(this.queue.state()?.id) + '/order-screen');
+  protected screenLink = computed(
+    () => `${this.queue.shareLink(this.queue.state()?.id)}/order-screen?pos=${this.pos}`,
+  );
   protected until = (t: number) => minutesUntil(t, this.queue.now());
   protected lastNumber = computed(
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
@@ -283,12 +315,14 @@ export class Take {
   send() {
     if (this.overLimit() || this.overType().length) return;
     const cart = this.cart();
-    const id = this.queue.addOrder(this.customer, cart, this.note);
+    const id = this.queue.addOrder(this.customer(), cart, this.note, this.draftId());
+    this.draftId.set(randomId(10));
+    this.showQr.set(false);
     this.lastId.set(id);
     // Keep the order to try again if it gets refused.
-    this.lastCart = { cart, customer: this.customer, note: this.note };
+    this.lastCart = { cart, customer: this.customer(), note: this.note };
     this.cart.set([]);
-    this.customer = '';
+    this.customer.set('');
     this.note = '';
   }
 
@@ -296,6 +330,19 @@ export class Take {
     const order = this.queue.orders().find((o) => o.id === id);
     if (order && confirm(`Cancel order #${order.number}?`))
       this.queue.setStatus(order, 'cancelled');
+  }
+}
+
+/** An id for this tab's order point, kept across reloads of the tab. */
+function orderPoint(): string {
+  try {
+    const saved = sessionStorage.getItem('pizza-queue:pos');
+    if (saved) return saved;
+    const id = randomId(8);
+    sessionStorage.setItem('pizza-queue:pos', id);
+    return id;
+  } catch {
+    return randomId(8);
   }
 }
 

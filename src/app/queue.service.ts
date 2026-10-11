@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, signal, untracked } from '@angular/core';
 import mqtt, { type MqttClient } from 'mqtt';
 import {
   MenuItem,
@@ -22,6 +22,25 @@ import { estimateReady } from './estimate';
 import { OrderTrack, TRACK_AFTER_DONE, orderTrack, trackCrypto } from './tracking';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
+
+/**
+ * What an order taker is doing right now, for the screen facing the customer: the order
+ * being taken (with the id it will get, so its QR code works before it's sent) and the
+ * order just sent.
+ */
+export interface OrderDraft {
+  /** Which order point (order taker's tab) this comes from. */
+  pos: string;
+  /** The id the order being taken will get. */
+  orderId: string;
+  customer: string;
+  pizzas: { name: string; color: string }[];
+  /** The order this order point sent last. */
+  sentId: string;
+  /** Show the QR code of the order just sent again. */
+  showQr: boolean;
+  at: number;
+}
 
 const HOST_KEY = (id: string) => `pizza-queue:host:${id}`;
 /** A staff device's copy of the queue, so it can take over when the host is gone. */
@@ -56,6 +75,9 @@ export class QueueService {
   readonly archive = signal<Order[]>([]);
   /** True while this device is trying to take over as host. */
   readonly takingOver = signal(false);
+  /** The latest draft from each order point, for the customer's order screen. */
+  readonly drafts = signal<ReadonlyMap<string, OrderDraft>>(new Map());
+  private draftChannel: BroadcastChannel | null = null;
   /** Ids of orders this device sent that were refused because too few pizzas were left. */
   readonly refused = signal<ReadonlySet<string>>(new Set());
   /** Ticks every 15 seconds so "x min ago" labels stay fresh. */
@@ -129,6 +151,19 @@ export class QueueService {
   private trackKeys = new Map<string, Promise<QueueCrypto>>();
 
   constructor() {
+    // Another window of this browser hosting the queue (such as the Orders tab next to the
+    // customer screen) saves every change; follow it even without internet.
+    window.addEventListener('storage', (e) => {
+      if (this.isHost() || !this.queueId || e.key !== HOST_KEY(this.queueId) || !e.newValue) return;
+      try {
+        const next = normalizeState(JSON.parse(e.newValue) as QueueState);
+        const mine = this.confirmed();
+        if (mine && next.hostEpoch < mine.hostEpoch) return;
+        this.confirmed.set(next);
+      } catch {
+        // Not a queue; ignore.
+      }
+    });
     setInterval(() => {
       this.now.set(Date.now());
       this.publishTracking();
@@ -166,6 +201,11 @@ export class QueueService {
     // Staff devices keep a copy, so the queue shows (and can be taken over) even offline.
     this.confirmed.set(this.loadHostState(id) ?? this.loadCopy(id));
     this.archive.set(this.loadArchive(id));
+    // A customer screen in another window of this browser gets drafts even offline.
+    if (typeof BroadcastChannel !== 'undefined') {
+      this.draftChannel = new BroadcastChannel(`pizza-queue-draft-${id}`);
+      this.draftChannel.onmessage = (e) => this.receiveDraft(e.data as OrderDraft);
+    }
     this.connectAs(false);
     if (this.loadHostState(id)) this.claimHost(id);
   }
@@ -179,9 +219,8 @@ export class QueueService {
     this.publishAction(action);
   }
 
-  /** Adds an order and returns its id. */
-  addOrder(customer: string, items: NewOrderItem[], note: string): string {
-    const id = randomId(10);
+  /** Adds an order and returns its id (given ahead when its QR code was already shown). */
+  addOrder(customer: string, items: NewOrderItem[], note: string, id = randomId(10)): string {
     this.dispatch({ type: 'add', id, customer, items, note });
     return id;
   }
@@ -265,6 +304,28 @@ export class QueueService {
     this.dispatch({ type: 'status', id: order.id, status });
   }
 
+  /** Shares what an order taker is doing with the customer's order screen. */
+  publishDraft(draft: OrderDraft): void {
+    // Called from an effect: reading the drafts here mustn't make it run again.
+    untracked(() => this.receiveDraft(draft));
+    this.draftChannel?.postMessage(draft);
+    this.outbox = this.outbox.then(async () => {
+      const crypto = this.crypto;
+      const client = this.client;
+      if (!crypto || !client?.connected) return;
+      const payload = await crypto.encrypt(draft);
+      // Retained, so a screen opened later shows the order straight away.
+      client.publish(`${this.topic('draft')}/${draft.pos}`, payload, { qos: 0, retain: true });
+    });
+  }
+
+  private receiveDraft(draft: OrderDraft): void {
+    if (!draft?.pos || !Array.isArray(draft.pizzas)) return;
+    const known = this.drafts().get(draft.pos);
+    if (known && known.at > draft.at) return;
+    this.drafts.update((m) => new Map(m).set(draft.pos, draft));
+  }
+
   shareLink(id = this.queueId): string {
     return `${appBase()}#/q/${id}`;
   }
@@ -293,6 +354,9 @@ export class QueueService {
     this.trackKeys.clear();
     this.claim = null;
     this.takingOver.set(false);
+    this.draftChannel?.close();
+    this.draftChannel = null;
+    this.drafts.set(new Map());
   }
 
   /**
@@ -332,7 +396,7 @@ export class QueueService {
 
   // ---- MQTT connection ----
 
-  private topic(name: 'state' | 'actions' | 'host' | 'presence' | 'claim'): string {
+  private topic(name: 'state' | 'actions' | 'host' | 'presence' | 'claim' | 'draft'): string {
     return `${this.crypto!.topic}/${name}`;
   }
 
@@ -359,6 +423,7 @@ export class QueueService {
       if (client !== this.client) return;
       this.connection.set('online');
       client.subscribe([this.topic('state'), this.topic('host'), this.topic('claim')], { qos: 1 });
+      client.subscribe(`${this.topic('draft')}/+`, { qos: 0 });
       if (!host) {
         this.announce();
         return;
@@ -414,6 +479,11 @@ export class QueueService {
   private async onMessage(topic: string, payload: string): Promise<void> {
     const crypto = this.crypto;
     if (!crypto) return;
+    if (topic.startsWith(`${this.topic('draft')}/`)) {
+      const draft = await crypto.decrypt<OrderDraft>(payload);
+      if (draft && crypto === this.crypto) this.receiveDraft(draft);
+      return;
+    }
     switch (topic) {
       case this.topic('host'): {
         // "1:<host id>" while a host is connected, "0:<host id>" once it's gone.

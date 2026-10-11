@@ -63,7 +63,8 @@ const STEPS = [
         <p class="track-big">{{ online() ? 'Looking up your order…' : 'Connecting…' }}</p>
         @if (slow()) {
           <p class="muted">
-            We can't find this order yet. It shows up as soon as the shop's screen is online.
+            Your order is still being taken. It shows up here as soon as it's sent to the
+            kitchen.
           </p>
         }
       }
