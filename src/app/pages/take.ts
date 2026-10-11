@@ -10,14 +10,26 @@ import { OrderCard } from './order-card';
 @Component({
   selector: 'app-take',
   imports: [FormsModule, OrderCard],
+  host: { '(document:keydown.escape)': 'showOpen.set(false)' },
   template: `
     <main class="page take">
-      <section class="card stack">
+      <section class="card take-card">
+        <div class="take-pick stack">
         <div class="take-head">
           <h1>New order</h1>
-          <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
-            >Customer screen ↗</a
-          >
+          <span class="take-links">
+            <button
+              class="btn small open-toggle"
+              type="button"
+              aria-haspopup="dialog"
+              (click)="showOpen.set(true)"
+            >
+              Open orders <span class="count">{{ open().length }}</span>
+            </button>
+            <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
+              >Customer screen ↗</a
+            >
+          </span>
         </div>
         @if (left() !== null) {
           <p class="left-note" [class.low]="canAdd() === false || left()! <= 10">
@@ -57,7 +69,10 @@ import { OrderCard } from './order-card';
           <input name="custom" [(ngModel)]="custom" placeholder="Something else…" maxlength="60" />
           <button class="btn" type="submit" [disabled]="!custom.trim() || !canAdd()">Add</button>
         </form>
+        </div>
 
+        <div class="take-cart stack">
+        <h2 class="cart-title">This order <span class="count">{{ cart().length }}</span></h2>
         @if (cart().length) {
           <ol class="cart">
             @for (line of cart(); track $index; let i = $index) {
@@ -109,7 +124,9 @@ import { OrderCard } from './order-card';
         } @else {
           <p class="muted">Tap a pizza to add it. Each pizza gets its own line and note.</p>
         }
+        </div>
 
+        <div class="take-pay stack">
         @if (totals(); as t) {
           <table class="totals">
             <tbody>
@@ -187,10 +204,26 @@ import { OrderCard } from './order-card';
         } @else if (lastId()) {
           <p class="sent pending">Sending order…</p>
         }
+        </div>
       </section>
 
-      <section class="stack">
-        <h2>Open orders</h2>
+      @if (showOpen()) {
+        <div class="drawer-backdrop" (click)="showOpen.set(false)"></div>
+      }
+      <section
+        class="open-orders stack"
+        role="dialog"
+        aria-label="Open orders"
+        [class.shown]="showOpen()"
+        [attr.aria-hidden]="!showOpen()"
+        [inert]="!showOpen()"
+      >
+        <div class="take-head">
+          <h2>Open orders</h2>
+          <button class="btn ghost small" type="button" (click)="showOpen.set(false)">
+            Close ✕
+          </button>
+        </div>
         @for (order of open(); track order.id) {
           <app-order-card [order]="order" [showStatus]="true">
             @if (order.status === 'new') {
@@ -211,6 +244,8 @@ export class Take {
   protected quickNotes = QUICK_NOTES;
   protected custom = '';
   protected customer = signal('');
+  /** The open orders slide in from the side only when asked, to leave room for the order. */
+  protected showOpen = signal(false);
   /** This order point, so its customer screen follows only this tab. */
   private pos = orderPoint();
   /** The id the order being taken will get, so the customer can scan its QR code early. */

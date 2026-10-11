@@ -1621,3 +1621,76 @@ input.swatch {
 .kitchen-grid.one-column {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Orders tab: pick pizzas, see this order and pay. On a wide screen this order sits on the
+   right; on a narrow one everything is one column, in that order. */
+.take {
+  grid-template-columns: minmax(0, 1fr);
+}
+.take-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+}
+.take-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.cart-title {
+  display: none;
+}
+@media (min-width: 861px) {
+  .take-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'pick cart' 'pay cart';
+    grid-template-rows: auto 1fr;
+    column-gap: 1.6rem;
+    align-items: start;
+  }
+  .take-pick {
+    grid-area: pick;
+  }
+  .take-pay {
+    grid-area: pay;
+  }
+  .take-cart {
+    grid-area: cart;
+    border-left: 1px solid var(--line);
+    padding-left: 1.6rem;
+    min-height: 100%;
+  }
+  .cart-title {
+    display: block;
+    margin: 0;
+  }
+}
+
+/* Open orders: a panel that slides in from the right. */
+.open-orders {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  width: min(440px, 100%);
+  overflow-y: auto;
+  padding: 1.2rem;
+  background: var(--cream);
+  box-shadow: -8px 0 24px rgb(40 20 0 / 18%);
+  transform: translateX(105%);
+  visibility: hidden;
+  transition:
+    transform 0.2s ease,
+    visibility 0.2s;
+}
+.open-orders.shown {
+  transform: none;
+  visibility: visible;
+}
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgb(30 15 0 / 30%);
+}
