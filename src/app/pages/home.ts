@@ -5,14 +5,16 @@ import { QueueService } from '../queue.service';
 import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing } from '../models';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
+import { InstallApp } from './install-app';
 
 @Component({
   selector: 'app-home',
-  imports: [FormsModule, MenuEditor, TimingEditor],
+  imports: [FormsModule, MenuEditor, TimingEditor, InstallApp],
   template: `
     <main class="home">
       <h1 class="brand"><span aria-hidden="true">🍕</span> Pizza queue</h1>
       <p class="lead">Take orders, bake them and call out the numbers, together on any device.</p>
+      <app-install />
 
       <form class="card stack" (ngSubmit)="create()">
         <h2>Start a new queue</h2>

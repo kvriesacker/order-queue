@@ -1694,3 +1694,12 @@ input.swatch {
   z-index: 49;
   background: rgb(30 15 0 / 30%);
 }
+
+/* Install the app on the home screen */
+app-install {
+  display: block;
+  margin-bottom: 1rem;
+}
+.install-hint {
+  margin: 0;
+}
