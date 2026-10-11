@@ -12,6 +12,8 @@ A shared order queue for a pizza shop, built with Angular. Everything runs in th
 
 Pizza queue is an installable web app. On Android, Chrome or Edge, press **Install app on this device** on the start page (or use the browser's install menu); on iPhone or iPad tap **Share**, then **Add to Home Screen**. It then opens from its own pizza icon without the browser bar, and the app itself is kept on the device so it opens even without a connection. Orders still need a connection to reach the other devices.
 
+Customers following their order from the QR code can press **Alert me when it's baking and ready**: their phone then shows a notification, buzzes and beeps when the pizzas go into the oven and again when the order is ready to collect. This works while the order page stays open (also in the background); on an iPhone it needs the page added to the Home Screen.
+
 ## Statistics
 
 The **Stats** tab shows what was sold: pizzas per type, revenue (when prices are set), the busiest 15 minutes, how long prepare, bake and counter really took compared with the settings, the average wait, cancellations, the most asked-for notes and when the pizzas sold out. A "For next time" list turns those into tips. **Download CSV** saves one row per pizza (with its price) for a spreadsheet, so the numbers survive after the queue ends.

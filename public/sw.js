@@ -63,3 +63,16 @@ self.addEventListener('fetch', (event) => {
     ),
   );
 });
+
+// Tapping an order alert brings the order page back.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const page = open.find((c) => c.url.includes('#/track/')) ?? open[0];
+      if (page) return page.focus();
+      return self.clients.openWindow('./');
+    })(),
+  );
+});

@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import mqtt, { type MqttClient } from 'mqtt';
 import { brokerUrl } from '../queue.service';
-import { OrderTrack, trackCrypto } from '../tracking';
+import { OrderTrack, TrackAlert, trackAlert, trackCrypto } from '../tracking';
 import { clockTime, minutesUntil } from '../estimate';
 import { randomId } from '../models';
 
@@ -46,12 +46,42 @@ const STEPS = [
           }
         }
 
+        @if (alert() === 'baking' && o.status !== 'ready-for-customer' && o.status !== 'collected') {
+          <p class="track-alert" role="status">Your pizza is in the oven!</p>
+        }
+
         @if (o.status !== 'cancelled') {
           <ol class="track-steps">
             @for (s of steps; track s.label) {
               <li [class.done]="s.done.includes(o.status)">{{ s.label }}</li>
             }
           </ol>
+        }
+        @if (o.status !== 'ready-for-customer' && o.status !== 'collected' && o.status !== 'cancelled') {
+          <div class="track-alerts">
+            @switch (permission()) {
+              @case ('granted') {
+                <p>🔔 Alerts on: you get a message when your pizza goes in the oven and when it's ready.</p>
+              }
+              @case ('default') {
+                <button class="btn primary" type="button" (click)="enableAlerts()">
+                  Alert me when it's baking and ready
+                </button>
+              }
+              @case ('denied') {
+                <p class="muted">
+                  Alerts are blocked for this site in your browser settings. This page still
+                  buzzes and changes when your order is ready.
+                </p>
+              }
+              @default {
+                <p class="muted">
+                  Keep this page open: it buzzes when your pizza is baking and when it's ready. On
+                  an iPhone, add it to your Home Screen to get alerts.
+                </p>
+              }
+            }
+          </div>
         }
         <p class="track-foot muted">
           This page updates by itself.
@@ -82,6 +112,12 @@ export class Track {
   protected until = (t: number) => minutesUntil(t, this.now());
 
   private client: MqttClient | null = null;
+  /** The last thing that happened worth telling, shown on the page too. */
+  protected alert = signal<TrackAlert | null>(null);
+  protected permission = signal<NotificationPermission | 'unsupported'>(
+    'Notification' in window ? Notification.permission : 'unsupported',
+  );
+  private audio: AudioContext | null = null;
 
   constructor() {
     const timer = setInterval(() => this.now.set(Date.now()), 15000);
@@ -92,7 +128,7 @@ export class Track {
       this.client?.end(true);
     });
     effect(() => this.follow(this.order$()));
-    // Buzz the phone once when the order is ready to collect.
+    // Buzz the phone once when the order is ready to collect, even if it was opened just then.
     let buzzed = false;
     effect(() => {
       if (this.order()?.status === 'ready-for-customer' && !buzzed) {
@@ -100,6 +136,53 @@ export class Track {
         navigator.vibrate?.([200, 100, 200]);
       }
     });
+  }
+
+  async enableAlerts() {
+    // A sound needs a tap first on phones, so get it ready now.
+    try {
+      this.audio = new AudioContext();
+    } catch {
+      this.audio = null;
+    }
+    this.permission.set(await Notification.requestPermission());
+  }
+
+  private tell(alert: TrackAlert, track: OrderTrack) {
+    this.alert.set(alert);
+    navigator.vibrate?.(alert === 'ready' ? [300, 100, 300, 100, 300] : [200]);
+    this.beep(alert === 'ready' ? 2 : 1);
+    if (this.permission() !== 'granted') return;
+    const title = alert === 'ready' ? `Order ${track.number} is ready!` : `Order ${track.number} is in the oven`;
+    const body =
+      alert === 'ready'
+        ? 'Please collect it at the counter.'
+        : track.eta
+          ? `Ready around ${clockTime(track.eta)}.`
+          : 'Almost there.';
+    const options: NotificationOptions = { body, tag: `order-${this.order$()}`, icon: 'icons/icon-192.png' };
+    // Through the service worker where there is one: phones only show notifications that way.
+    const plain = () => void new Notification(title, options);
+    navigator.serviceWorker?.getRegistration().then(
+      (reg) => (reg ? reg.showNotification(title, options) : plain()),
+      plain,
+    ) ?? plain();
+  }
+
+  private beep(times: number) {
+    const ctx = this.audio;
+    if (!ctx) return;
+    for (let i = 0; i < times; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = ctx.currentTime + i * 0.35;
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    }
   }
 
   private async follow(orderId: string) {
@@ -126,7 +209,10 @@ export class Track {
       inbox = inbox.then(async () => {
         if (!text) return;
         const track = await crypto.decrypt<OrderTrack>(text);
-        if (track && client === this.client) this.order.set(track);
+        if (!track || client !== this.client) return;
+        const alert = trackAlert(this.order(), track);
+        this.order.set(track);
+        if (alert) this.tell(alert, track);
       });
     });
   }

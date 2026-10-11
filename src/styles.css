@@ -1703,3 +1703,20 @@ app-install {
 .install-hint {
   margin: 0;
 }
+
+/* Order alerts for the customer */
+.track-alert {
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: var(--crust);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.track-alerts {
+  margin-top: 1rem;
+}
+.track-alerts p {
+  margin: 0;
+}

@@ -1,4 +1,4 @@
-import { Order, OrderStatus, QueueState } from './models';
+import { DisplayStage, Order, OrderStatus, QueueState, displayStage } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
@@ -13,6 +13,8 @@ export interface OrderTrack {
   customer: string;
   pizzas: string;
   status: OrderStatus;
+  /** Which block of the customer display the order is in (older hosts don't send it). */
+  stage?: DisplayStage | null;
   /** Estimated ready time, cut to the minute, as clocks show it; absent once the order is ready. */
   eta?: number;
 }
@@ -31,6 +33,22 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     customer: order.customer,
     pizzas: pizzaSummary(order),
     status: order.status,
+    stage: displayStage(order),
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
   };
+}
+
+export type TrackAlert = 'baking' | 'ready';
+
+/**
+ * What to tell a customer following their order: once when it goes into the oven and once when
+ * it's ready to collect. Nothing for what was already true when they opened the page.
+ */
+export function trackAlert(before: OrderTrack | null, after: OrderTrack): TrackAlert | null {
+  if (!before) return null;
+  if (after.status === 'ready-for-customer' && before.status !== 'ready-for-customer') return 'ready';
+  if (after.stage === 'baking' && before.stage !== 'baking' && before.status !== 'ready-for-customer') {
+    return 'baking';
+  }
+  return null;
 }
