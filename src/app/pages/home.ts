@@ -50,14 +50,24 @@ import { InstallApp } from './install-app';
         }
       </form>
 
-      @if (mine.length) {
+      @if (mine().length) {
         <section class="card stack">
           <h2>Your queues</h2>
-          @for (q of mine; track q.id) {
-            <button class="btn row-btn" type="button" (click)="go(q.id)">
-              <span>{{ q.name }}</span>
-              <span class="muted">{{ q.id }} · {{ q.orders.length }} orders</span>
-            </button>
+          @for (q of mine(); track q.id) {
+            <div class="queue-row">
+              <button class="btn row-btn" type="button" (click)="go(q.id)">
+                <span>{{ q.name }}</span>
+                <span class="muted">{{ lastUsed(q) }} · {{ q.orders.length }} {{ q.orders.length === 1 ? 'order' : 'orders' }}</span>
+              </button>
+              <button
+                class="btn ghost small"
+                type="button"
+                [attr.aria-label]="'Remove ' + q.name"
+                (click)="remove(q)"
+              >
+                Remove
+              </button>
+            </div>
           }
         </section>
       }
@@ -74,7 +84,7 @@ export class Home {
   createError = signal('');
   menu = signal<MenuItem[]>(lastMenu());
   timing = signal<Timing>(lastTiming());
-  mine = hostedQueues();
+  mine = signal(hostedQueues());
 
   create() {
     if (!this.menu().some((m) => m.enabled)) {
@@ -97,6 +107,22 @@ export class Home {
       return;
     }
     this.go(match[1].toLowerCase());
+  }
+
+  /** When the queue last had an order, so old ones are easy to spot. */
+  lastUsed(q: QueueState): string {
+    const last = Math.max(0, ...q.orders.map((o) => o.updatedAt ?? o.createdAt));
+    if (!last) return 'no orders yet';
+    return new Date(last).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  remove(q: QueueState) {
+    const ok = confirm(
+      `Remove “${q.name}” from this device? Its orders and statistics on this device are deleted. Download the statistics first if you still need them.`,
+    );
+    if (!ok) return;
+    this.queue.forget(q.id);
+    this.mine.set(hostedQueues());
   }
 
   go(id: string) {
@@ -141,5 +167,7 @@ function hostedQueues(): QueueState[] {
   } catch {
     // Storage unavailable; nothing to list.
   }
-  return result;
+  // Most recently used first.
+  const last = (q: QueueState) => Math.max(0, ...q.orders.map((o) => o.updatedAt ?? o.createdAt));
+  return result.sort((a, b) => last(b) - last(a));
 }

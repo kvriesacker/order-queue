@@ -1720,3 +1720,29 @@ app-install {
 .track-alerts p {
   margin: 0;
 }
+
+/* Your queues on the start page, each with a Remove button */
+.queue-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.queue-row .row-btn {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  white-space: normal;
+  text-align: left;
+}
+.queue-row .row-btn span {
+  overflow-wrap: anywhere;
+}
+.queue-row .row-btn .muted {
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+.queue-row > .btn.ghost {
+  flex-shrink: 0;
+}

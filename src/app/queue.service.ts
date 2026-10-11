@@ -205,6 +205,15 @@ export class QueueService {
     return id;
   }
 
+  /**
+   * Removes a queue from this device: its orders, copy and statistics. Other devices keep
+   * theirs; if this device was the host, one of them can take over.
+   */
+  forget(id: string): void {
+    if (id === this.queueId) this.close();
+    for (const key of [HOST_KEY(id), COPY_KEY(id), ARCHIVE_KEY(id)]) localStorage.removeItem(key);
+  }
+
   /** Connects to a queue, as host when this browser created it, otherwise as guest. */
   async open(id: string): Promise<void> {
     if (id === this.queueId) return;
