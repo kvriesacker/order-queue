@@ -24,7 +24,7 @@ import { TimingEditor } from './timing-editor';
           <strong>Pizzas on the menu</strong>
           <span class="hint">Untick what you don’t sell and pick a color for each pizza.</span>
         </div>
-        <app-menu-editor [(menu)]="menu" />
+        <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
         <strong>Pizzas and ready times</strong>
         <app-timing-editor [(timing)]="timing" />
         @if (createError()) {

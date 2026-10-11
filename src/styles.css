@@ -1543,3 +1543,77 @@ input.swatch {
   flex-wrap: wrap;
   min-width: 0;
 }
+
+/* Prices */
+.menu-editor .item-price {
+  width: 4.8rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.5rem;
+}
+.totals {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fffaf3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 1rem;
+}
+.totals td,
+.totals th {
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+}
+.totals tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+.totals .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.totals tfoot th {
+  border-top: 2px solid var(--crust);
+  font-size: 1.15rem;
+}
+.os-lines li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 1rem;
+}
+.os-calc {
+  font-size: 0.6em;
+  font-weight: 500;
+  color: #b9a79a;
+  white-space: nowrap;
+}
+.os-sub {
+  white-space: nowrap;
+}
+.os-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 2px solid var(--crust);
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  font-weight: 800;
+}
+.os-total strong {
+  color: var(--crust);
+}
+.os-pizzas strong { color: var(--crust); }
+/* On a phone the pizza name gets its own line, with price, max and color below it. */
+@media (max-width: 560px) {
+  .menu-editor li {
+    flex-wrap: wrap;
+  }
+  .menu-editor li .check {
+    flex-basis: 100%;
+  }
+  .menu-editor li .item-price,
+  .menu-editor li .item-max {
+    flex: 1;
+  }
+}

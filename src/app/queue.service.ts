@@ -34,7 +34,8 @@ export interface OrderDraft {
   /** The id the order being taken will get. */
   orderId: string;
   customer: string;
-  pizzas: { name: string; color: string }[];
+  /** Each pizza with its price in euros (0 when the queue has no prices). */
+  pizzas: { name: string; color: string; price?: number }[];
   /** The order this order point sent last. */
   sentId: string;
   /** Show the QR code of the order just sent again. */

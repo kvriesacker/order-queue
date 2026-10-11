@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NewOrderItem, OTHER_COLOR, randomId } from '../models';
+import { NewOrderItem, OTHER_COLOR, formatPrice, orderTotal, priceOf, randomId } from '../models';
 
 const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
@@ -110,6 +110,26 @@ import { OrderCard } from './order-card';
           <p class="muted">Tap a pizza to add it. Each pizza gets its own line and note.</p>
         }
 
+        @if (totals(); as t) {
+          <table class="totals">
+            <tbody>
+              @for (line of t.lines; track line.name) {
+                <tr>
+                  <td>{{ line.count }}× {{ line.name }}</td>
+                  <td class="num muted">{{ line.count }} × {{ price(line.price) }}</td>
+                  <td class="num">{{ price(line.subtotal) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="2">Total ({{ t.count }} {{ t.count === 1 ? 'pizza' : 'pizzas' }})</th>
+                <th class="num">{{ price(t.total) }}</th>
+              </tr>
+            </tfoot>
+          </table>
+        }
+
         <div class="grid2">
           <label>
             <span>Customer name <span class="muted">(optional)</span></span>
@@ -152,6 +172,9 @@ import { OrderCard } from './order-card';
         } @else if (lastNumber()) {
           <p class="sent">
             Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
+            @if (lastTotal()) {
+              <br />To pay: <strong>{{ price(lastTotal()) }}</strong>
+            }
             @if (lastEta(); as t) {
               <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
             }
@@ -216,7 +239,7 @@ export class Take {
         pos: this.pos,
         orderId: this.draftId(),
         customer: this.customer().trim(),
-        pizzas: this.cart().map((l) => ({ name: l.name, color: l.color })),
+        pizzas: this.cart().map((l) => ({ name: l.name, color: l.color, price: this.priceFor(l.name) })),
         sentId: this.lastId(),
         showQr: this.showQr(),
         at: Date.now(),
@@ -245,6 +268,28 @@ export class Take {
     const left = this.left();
     return left !== null && this.cart().length > left;
   });
+  protected price = formatPrice;
+  /** What one pizza of this name costs (custom pizzas: the general price). */
+  private priceFor(name: string): number {
+    const state = this.queue.state();
+    return state ? priceOf(state, name) : 0;
+  }
+  /** The order's price per pizza type and in total, when the queue has prices. */
+  protected totals = computed(() => {
+    const cart = this.cart();
+    if (!cart.length) return null;
+    const lines = new Map<string, { name: string; count: number; price: number; subtotal: number }>();
+    for (const l of cart) {
+      const line = lines.get(l.name) ?? { name: l.name, count: 0, price: this.priceFor(l.name), subtotal: 0 };
+      line.count++;
+      line.subtotal = Math.round(line.count * line.price * 100) / 100;
+      lines.set(l.name, line);
+    }
+    const all = [...lines.values()];
+    if (all.every((l) => !l.price)) return null;
+    const total = Math.round(all.reduce((sum, l) => sum + l.subtotal, 0) * 100) / 100;
+    return { lines: all, count: cart.length, total };
+  });
   /** How many more of a menu pizza can go in this order (null: no maximum for that type). */
   protected typeLeftAfterCart(name: string): number | null {
     const left = this.queue.typeLeft().get(name);
@@ -269,6 +314,10 @@ export class Take {
     () => `${this.queue.shareLink(this.queue.state()?.id)}/order-screen?pos=${this.pos}`,
   );
   protected until = (t: number) => minutesUntil(t, this.queue.now());
+  protected lastTotal = computed(() => {
+    const order = this.queue.orders().find((o) => o.id === this.lastId());
+    return order ? orderTotal(order) : 0;
+  });
   protected lastNumber = computed(
     () => this.queue.orders().find((o) => o.id === this.lastId())?.number,
   );

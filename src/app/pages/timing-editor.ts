@@ -33,6 +33,21 @@ const OVEN_FIELDS: Field[] = [
         (input)="setMax($any($event.target).valueAsNumber)"
       />
     </label>
+    <label class="max-pizzas">
+      <span
+        >Price per pizza in € <span class="muted">(0 = don't show prices; set other prices per pizza above)</span></span
+      >
+      <input
+        type="number"
+        min="0"
+        max="1000"
+        step="0.5"
+        inputmode="decimal"
+        [value]="timing().price"
+        (input)="setPrice($any($event.target).valueAsNumber)"
+        aria-label="Price per pizza"
+      />
+    </label>
     <div class="grid3">
       @for (f of fields; track f.key) {
         <label>
@@ -82,6 +97,10 @@ export class TimingEditor {
 
   setMax(value: number) {
     if (value >= 0 && Number.isInteger(value)) this.timing.update((t) => ({ ...t, maxPizzas: value }));
+  }
+
+  setPrice(value: number) {
+    if (value >= 0 && value <= 1000) this.timing.update((t) => ({ ...t, price: Math.round(value * 100) / 100 }));
   }
 
   set(key: keyof Timing, value: number, whole = false) {

@@ -16,7 +16,7 @@ import { TimingEditor } from './timing-editor';
         @if (queue.isHost()) {
           <h2>Menu</h2>
           <p class="hint">Changes apply to new orders. Orders already placed keep their colors.</p>
-          <app-menu-editor [(menu)]="menu" />
+          <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
           <h2>Pizzas and ready times</h2>
           @if (sold(); as s) {
             <p class="hint">

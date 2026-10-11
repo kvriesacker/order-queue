@@ -1,4 +1,4 @@
-import { Order, QueueState } from './models';
+import { Order, QueueState, orderTotal } from './models';
 
 const MINUTE = 60000;
 /** Orders are grouped into blocks of this many minutes to find the busy moments. */
@@ -17,6 +17,8 @@ export interface PhaseStat {
 export interface QueueStats {
   orders: number;
   pizzas: number;
+  /** Money taken in euros, from the prices pizzas had when ordered (cancelled orders left out). */
+  revenue: number;
   cancelledOrders: number;
   cancelledPizzas: number;
   pizzasPerOrder: number;
@@ -135,6 +137,7 @@ export function queueStats(state: QueueState, archived: Order[] = []): QueueStat
   return {
     orders: sold.length,
     pizzas,
+    revenue: Math.round(sold.reduce((sum, o) => sum + orderTotal(o), 0) * 100) / 100,
     cancelledOrders: cancelled.length,
     cancelledPizzas: cancelled.reduce((n, o) => n + qty(o), 0),
     pizzasPerOrder: sold.length ? pizzas / sold.length : 0,
@@ -165,7 +168,7 @@ export function queueStats(state: QueueState, archived: Order[] = []): QueueStat
 export function statsCsv(state: QueueState, archived: Order[] = []): string {
   const time = (t?: number) => (t ? new Date(t).toLocaleString() : '');
   const rows = [
-    ['Order', 'Customer', 'Ordered at', 'Status', 'Pizza', 'Note', 'Prepared at', 'Baked at', 'Called at'],
+    ['Order', 'Customer', 'Ordered at', 'Status', 'Pizza', 'Price', 'Note', 'Prepared at', 'Baked at', 'Called at'],
   ];
   for (const o of mergeOrders(archived, state.orders))
     for (const i of o.items)
@@ -177,6 +180,7 @@ export function statsCsv(state: QueueState, archived: Order[] = []): string {
           time(o.createdAt),
           o.status,
           i.name,
+          (i.price ?? 0).toFixed(2),
           i.note,
           time(t.prepared),
           time(t.baked),

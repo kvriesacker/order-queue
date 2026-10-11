@@ -10,7 +10,7 @@ function queue(maxPizzas = 0): QueueState {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas },
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas, price: 0 },
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},

@@ -10,7 +10,7 @@ function queue(): QueueState {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0, price: 0 },
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},

@@ -1,6 +1,7 @@
 import {
   Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks,
-  kitchenLeft, leftChange, pizzasLeft, typeLeft, typeMade, typeSold,
+  cleanPrice, formatPrice, kitchenLeft, leftChange, orderTotal, pizzasLeft, priceOf, typeLeft, typeMade,
+  typeSold,
 } from './models';
 
 describe('applyAction', () => {
@@ -9,7 +10,7 @@ describe('applyAction', () => {
     name: 'Test',
     nextNumber: 1,
     menu: [],
-    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
+    timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0, price: 0 },
     orders: [],
     soldCleared: 0,
     soldClearedByType: {},
@@ -50,6 +51,36 @@ describe('applyAction', () => {
     s = applyAction(s, { type: 'timing', timing: { ...s.timing, ovens: 2 } });
     expect(s.ovensOut).toEqual([]);
     expect(normalizeState({ ...s, ovensOut: undefined } as unknown as QueueState).ovensOut).toEqual([]);
+  });
+
+  it('charges the general price unless a pizza has its own, as set when ordered', () => {
+    let s: QueueState = {
+      ...empty,
+      timing: { ...empty.timing, price: 9.5 },
+      menu: [
+        { name: 'Margherita', color: '#e53935', enabled: true },
+        { name: 'Calzone', color: '#00acc1', enabled: true, price: 12 },
+      ],
+    };
+    expect(priceOf(s, 'Margherita')).toBe(9.5);
+    expect(priceOf(s, 'Calzone')).toBe(12);
+    expect(priceOf(s, 'Something else')).toBe(9.5);
+    s = applyAction(s, {
+      type: 'add', id: 'a', customer: '', note: '',
+      items: [
+        { name: 'Margherita', qty: 2, note: '', color: '#e53935' },
+        { name: 'Calzone', qty: 1, note: '', color: '#00acc1' },
+      ],
+    });
+    expect(orderTotal(s.orders[0])).toBe(31);
+    // A later price change doesn't change what was already ordered.
+    s = applyAction(s, { type: 'timing', timing: { ...s.timing, price: 11 } });
+    expect(orderTotal(s.orders[0])).toBe(31);
+    expect(priceOf(s, 'Margherita')).toBe(11);
+    // Prices are rounded to cents; nonsense becomes "no price".
+    expect(cleanPrice(9.999)).toBe(10);
+    expect(cleanPrice(-1)).toBe(0);
+    expect(formatPrice(9.5)).toBe('€9.50');
   });
 
   describe('maximum per pizza type', () => {

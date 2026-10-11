@@ -28,19 +28,19 @@ test('the customer screen follows the order as it is taken', async ({ page, cont
   await page.locator('.menu-item', { hasText: 'Funghi' }).click();
   await page.locator('input[name=customer]').fill('Anna');
   const lines = screen.locator('.os-lines li');
-  await expect(lines).toHaveText(['2× Margherita', '1× Funghi']);
+  await expect(lines).toHaveText([/2× Margherita/, /1× Funghi/]);
   await expect(screen.locator('.os-name')).toHaveText('Anna');
   await expect(screen.getByText('Scan me to follow your order')).toBeVisible();
   await expect(screen.locator('.qr svg')).toBeVisible();
   // Removing a pizza shows at once.
   await page.getByRole('button', { name: 'Remove this pizza' }).last().click();
-  await expect(lines).toHaveText(['2× Margherita']);
+  await expect(lines).toHaveText([/2× Margherita/]);
 
   // Sent: the number and time show, and the QR code goes away...
   await page.getByRole('button', { name: 'Send to kitchen' }).click();
   await expect(page.getByText(/Order #1 sent/)).toBeVisible();
   await expect(screen.locator('.os-number')).toHaveText('1');
-  await expect(screen.locator('.os-pizzas')).toHaveText('2× Margherita');
+  await expect(screen.locator('.os-pizzas:not(.os-paid)')).toHaveText('2× Margherita');
   await expect(screen.locator('.qr svg')).toHaveCount(0);
 
   // ...until the order taker shows it again.
@@ -52,7 +52,7 @@ test('the customer screen follows the order as it is taken', async ({ page, cont
 
   // The next customer's order takes over the screen.
   await page.locator('.menu-item', { hasText: 'Diavola' }).click();
-  await expect(lines).toHaveText(['1× Diavola']);
+  await expect(lines).toHaveText([/1× Diavola/]);
   await expect(screen.locator('.qr svg')).toBeVisible();
 
   const width = await screen.evaluate(() => document.documentElement.scrollWidth);

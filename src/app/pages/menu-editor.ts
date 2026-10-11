@@ -1,4 +1,4 @@
-import { Component, model, signal } from '@angular/core';
+import { Component, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MenuItem } from '../models';
 
@@ -18,6 +18,19 @@ import { MenuItem } from '../models';
             />
             <span class="name">{{ item.name }}</span>
           </label>
+          <input
+            type="number"
+            class="item-price"
+            min="0"
+            max="1000"
+            step="0.5"
+            inputmode="decimal"
+            [placeholder]="'€ ' + (defaultPrice() || '–')"
+            title="Price of this pizza (empty: the general price)"
+            [value]="item.price || ''"
+            (change)="update($index, { price: priceFrom($any($event.target).value) })"
+            [attr.aria-label]="'Price ' + item.name"
+          />
           <input
             type="number"
             class="item-max"
@@ -66,7 +79,10 @@ import { MenuItem } from '../models';
       />
       <button class="btn" type="button" [disabled]="!newName.trim()" (click)="add()">Add</button>
     </div>
-    <p class="muted small">Max: how many of a pizza the ingredients allow. Leave empty for no limit.</p>
+    <p class="muted small">
+      €: a price for this pizza (empty: the general price below). Max: how many of a pizza the
+      ingredients allow (empty: no limit).
+    </p>
     @if (duplicate()) {
       <p class="error">That pizza is already on the list.</p>
     }
@@ -74,12 +90,19 @@ import { MenuItem } from '../models';
 })
 export class MenuEditor {
   readonly menu = model.required<MenuItem[]>();
+  /** The general price, shown where a pizza has no price of its own. */
+  readonly defaultPrice = input(0);
   protected newName = '';
   protected newColor = randomColor();
   protected duplicate = signal(false);
 
   update(index: number, change: Partial<MenuItem>) {
     this.menu.update((menu) => menu.map((m, i) => (i === index ? { ...m, ...change } : m)));
+  }
+
+  protected priceFrom(value: string): number {
+    const n = Number(value);
+    return value.trim() && n > 0 && n <= 1000 ? Math.round(n * 100) / 100 : 0;
   }
 
   protected maxFrom(value: string): number {

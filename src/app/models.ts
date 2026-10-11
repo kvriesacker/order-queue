@@ -15,6 +15,8 @@ export interface MenuItem {
   max?: number;
   /** Marked sold out by hand, for example when an ingredient runs out early. */
   soldOut?: boolean;
+  /** Price of this pizza in euros; 0 or missing means the general price. */
+  price?: number;
 }
 
 export interface OrderItem {
@@ -26,6 +28,8 @@ export interface OrderItem {
   units: PizzaStatus[];
   /** When each pizza was prepared and baked, to learn how long each phase takes. */
   times: PizzaTimes[];
+  /** Price of one pizza in euros when it was ordered (0 when the queue has no prices). */
+  price?: number;
 }
 
 export interface PizzaTimes {
@@ -93,6 +97,8 @@ export interface Timing {
   pizzasPerOven: number;
   /** How many pizzas can be made in total (dough, toppings); 0 means no limit. */
   maxPizzas: number;
+  /** General price of a pizza in euros; 0 means the queue shows no prices. */
+  price: number;
 }
 
 export const DEFAULT_TIMING: Timing = {
@@ -102,6 +108,7 @@ export const DEFAULT_TIMING: Timing = {
   ovens: 1,
   pizzasPerOven: 4,
   maxPizzas: 0,
+  price: 10,
 };
 /** The phase durations, in minutes. */
 export const TIMING_KEYS = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'] as const;
@@ -109,6 +116,29 @@ export const TIMING_KEYS = ['prepareMinutes', 'bakeMinutes', 'counterMinutes'] a
 export const OVEN_KEYS = ['ovens', 'pizzasPerOven'] as const;
 const OVEN_MAX = 50;
 const MAX_PIZZAS = 99999;
+const MAX_PRICE = 1000;
+
+/** A valid price in euros, rounded to cents; 0 when missing or invalid. */
+export function cleanPrice(n: unknown): number {
+  return typeof n === 'number' && n > 0 && n <= MAX_PRICE ? Math.round(n * 100) / 100 : 0;
+}
+
+/** What one pizza of this type costs now: its own price, or else the general price. */
+export function priceOf(state: Pick<QueueState, 'menu' | 'timing'>, name: string): number {
+  return state.menu.find((m) => m.name === name)?.price || state.timing.price || 0;
+}
+
+/** The price of an order, from the prices its pizzas had when it was ordered. */
+export function orderTotal(order: Pick<Order, 'items'>): number {
+  return Math.round(order.items.reduce((sum, i) => sum + (i.price ?? 0) * i.qty, 0) * 100) / 100;
+}
+
+const EURO = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' });
+
+/** "€9.50" */
+export function formatPrice(euros: number): string {
+  return EURO.format(euros);
+}
 
 /** Pizzas sold so far: every order except cancelled ones. */
 export function pizzasSold(state: QueueState): number {
@@ -241,6 +271,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
             color: isColor(i.color) ? i.color : OTHER_COLOR,
             units: Array<PizzaStatus>(qty).fill('new'),
             times: Array.from({ length: qty }, () => ({})),
+            // The host's prices count, so every order taker charges the same.
+            price: priceOf(state, i.name.trim().slice(0, 60)),
           };
         });
       if (!items.length) return state;
@@ -314,6 +346,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       for (const key of OVEN_KEYS) timing[key] = count(action.timing[key], timing[key]);
       const max = action.timing.maxPizzas;
       if (typeof max === 'number' && max >= 0 && max <= MAX_PIZZAS) timing.maxPizzas = Math.floor(max);
+      if (typeof action.timing.price === 'number') timing.price = cleanPrice(action.timing.price);
       return { ...state, timing, ovensOut: state.ovensOut.filter((i) => i < timing.ovens) };
     }
     case 'menu': {
@@ -325,6 +358,7 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           color: isColor(m.color) ? m.color : OTHER_COLOR,
           enabled: !!m.enabled,
           max: typeMax(m.max),
+          price: cleanPrice(m.price),
           // Sold out is the kitchen's call, so a Settings save keeps what the kitchen set.
           soldOut: !!state.menu.find((old) => old.name === m.name.trim())?.soldOut,
         }));
@@ -411,6 +445,7 @@ export function normalizeState(state: QueueState): QueueState {
     ...m,
     max: typeMax(m.max),
     soldOut: !!m.soldOut,
+    price: cleanPrice(m.price),
   }));
   // Queues from before the three phases had a different timing shape; start fresh.
   const timing = TIMING_KEYS.every((k) => (state.timing?.[k] ?? 0) > 0)
@@ -419,6 +454,8 @@ export function normalizeState(state: QueueState): QueueState {
   // Queues from before the oven settings get the default oven.
   for (const key of OVEN_KEYS) if (!(timing[key] >= 1)) timing[key] = DEFAULT_TIMING[key];
   if (!(timing.maxPizzas >= 0)) timing.maxPizzas = 0;
+  // Queues from before prices show none until the host sets one.
+  timing.price = cleanPrice(timing.price);
   const colorOf = (name: string) => menu.find((m) => m.name === name)?.color ?? OTHER_COLOR;
   const orders = state.orders.map((o) => {
     const current = (u: string) => PIZZA_STATUSES.includes(u as PizzaStatus);

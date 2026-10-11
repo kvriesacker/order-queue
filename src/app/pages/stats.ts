@@ -3,6 +3,7 @@ import { DecimalPipe, PercentPipe } from '@angular/common';
 import { QueueService } from '../queue.service';
 import { BLOCK_MINUTES, queueStats, statsCsv } from '../stats';
 import { clockTime } from '../estimate';
+import { formatPrice } from '../models';
 
 /** Totals and timings of everything ordered, to learn from for the next event. */
 @Component({
@@ -28,6 +29,13 @@ import { clockTime } from '../estimate';
               <span class="muted">of {{ s().maxPizzas }} available</span>
             }
           </div>
+          @if (s().revenue) {
+            <div class="tile">
+              <span class="tile-label">Revenue</span>
+              <strong class="tile-value">{{ price(s().revenue) }}</strong>
+              <span class="muted">{{ price(s().revenue / (s().orders || 1)) }} per order</span>
+            </div>
+          }
           <div class="tile">
             <span class="tile-label">Orders</span>
             <strong class="tile-value">{{ s().orders }}</strong>
@@ -180,6 +188,7 @@ export class Stats {
   protected queue = inject(QueueService);
   protected block = BLOCK_MINUTES;
   protected clock = clockTime;
+  protected price = formatPrice;
 
   protected s = computed(() => {
     const state = this.queue.state();
@@ -263,7 +272,7 @@ const EMPTY_STATE = {
   name: '',
   nextNumber: 1,
   menu: [],
-  timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0 },
+  timing: { prepareMinutes: 3, bakeMinutes: 8, counterMinutes: 2, ovens: 1, pizzasPerOven: 4, maxPizzas: 0, price: 0 },
   orders: [],
   soldCleared: 0,
   soldClearedByType: {},

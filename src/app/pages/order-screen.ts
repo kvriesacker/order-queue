@@ -3,6 +3,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { renderSVG } from 'uqr';
 import { OrderDraft, QueueService } from '../queue.service';
+import { formatPrice, orderTotal } from '../models';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
 
 /** How long the last order stays on the screen when no new one comes in. */
@@ -32,10 +33,17 @@ const DRAFT_MAX_AGE = 60 * 60000;
             <ul class="os-lines">
               @for (line of b.lines; track line.name) {
                 <li [style.border-left-color]="line.color">
-                  <strong>{{ line.count }}×</strong> {{ line.name }}
+                  <span><strong>{{ line.count }}×</strong> {{ line.name }}</span>
+                  @if (b.total) {
+                    <span class="os-calc">{{ line.count }} × {{ price(line.price) }}</span>
+                    <span class="os-sub">{{ price(line.subtotal) }}</span>
+                  }
                 </li>
               }
             </ul>
+            @if (b.total) {
+              <p class="os-total"><span>Total</span> <strong>{{ price(b.total) }}</strong></p>
+            }
           </section>
           <section class="os-qr">
             <div class="qr" [innerHTML]="b.qr"></div>
@@ -52,6 +60,9 @@ const DRAFT_MAX_AGE = 60 * 60000;
                 <p class="os-name">{{ order.customer }}</p>
               }
               <p class="os-pizzas">{{ c.pizzas }}</p>
+              @if (c.total) {
+                <p class="os-pizzas os-paid">Total <strong>{{ price(c.total) }}</strong></p>
+              }
               @if (c.eta) {
                 <p class="os-eta">
                   Ready around <strong>{{ clock(c.eta) }}</strong>&nbsp;<span>({{ until(c.eta) }})</span>
@@ -95,6 +106,7 @@ export class OrderScreen {
   private sanitizer = inject(DomSanitizer);
   readonly id = input.required<string>();
   protected clock = clockTime;
+  protected price = formatPrice;
   protected until = (t: number) => minutesUntil(t, this.queue.now());
 
   /** Which order point to follow (from the link on the Orders tab); any when missing. */
@@ -113,13 +125,19 @@ export class OrderScreen {
   protected building = computed(() => {
     const draft = this.draft();
     if (!draft?.pizzas.length) return null;
-    const lines = new Map<string, { name: string; color: string; count: number }>();
+    const lines = new Map<
+      string,
+      { name: string; color: string; count: number; price: number; subtotal: number }
+    >();
     for (const p of draft.pizzas) {
-      const line = lines.get(p.name) ?? { ...p, count: 0 };
+      const line = lines.get(p.name) ?? { name: p.name, color: p.color, count: 0, price: p.price ?? 0, subtotal: 0 };
       line.count++;
+      line.subtotal = Math.round(line.count * line.price * 100) / 100;
       lines.set(p.name, line);
     }
-    return { customer: draft.customer, lines: [...lines.values()], qr: this.qr(draft.orderId) };
+    const all = [...lines.values()];
+    const total = Math.round(all.reduce((sum, l) => sum + l.subtotal, 0) * 100) / 100;
+    return { customer: draft.customer, lines: all, total, qr: this.qr(draft.orderId) };
   });
 
   /**
@@ -145,6 +163,7 @@ export class OrderScreen {
     return {
       order,
       pizzas: pizzaSummary(order),
+      total: orderTotal(order),
       eta: this.queue.estimates().get(order.id),
       qr,
     };
