@@ -1,6 +1,6 @@
 import {
   Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks,
-  leftChange, pizzasLeft, typeLeft, typeSold,
+  kitchenLeft, leftChange, pizzasLeft, typeLeft, typeMade, typeSold,
 } from './models';
 
 describe('applyAction', () => {
@@ -87,24 +87,31 @@ describe('applyAction', () => {
       expect(s.menu[0]).toMatchObject({ max: 6, soldOut: true });
     });
 
-    it('turns "left" from the kitchen into a maximum of sold plus left', () => {
+    it('counts ordered pizzas the kitchen has not prepared as still left for the kitchen', () => {
       let s: QueueState = { ...empty, menu: menu(0) };
       s = applyAction(s, order('a', [['Margherita', 3]]));
       const setLeft = (left: number | null) =>
-        applyAction(s, { type: 'type-limit', name: 'Margherita', ...leftChange(typeSold(s, 'Margherita'), left) });
-      s = setLeft(4);
-      expect(s.menu[0].max).toBe(7);
-      expect(typeLeft(s, 'Margherita')).toBe(4);
-      s = setLeft(0);
-      expect(typeLeft(s, 'Margherita')).toBe(0);
-      expect(s.menu[0].soldOut).toBe(true);
-      // More ingredients put it back on sale.
+        applyAction(s, { type: 'type-limit', name: 'Margherita', ...leftChange(typeMade(s, 'Margherita'), left) });
+      // Nothing prepared yet: ingredients for 5 means 5 - 3 ordered = 2 more to sell.
+      s = setLeft(5);
+      expect(s.menu[0].max).toBe(5);
+      expect(kitchenLeft(s, 'Margherita')).toBe(5);
+      expect(typeLeft(s, 'Margherita')).toBe(2);
+      // Preparing one uses up ingredients, but doesn't change what can be sold.
+      s = applyAction(s, { type: 'pizza', id: 'a', item: 0, unit: 0, status: 'prepared' });
+      expect(typeMade(s, 'Margherita')).toBe(1);
+      expect(kitchenLeft(s, 'Margherita')).toBe(4);
+      expect(typeLeft(s, 'Margherita')).toBe(2);
+      // Only enough for the ordered ones: nothing more to sell.
       s = setLeft(2);
-      expect(s.menu[0]).toMatchObject({ max: 5, soldOut: false });
+      expect(s.menu[0].max).toBe(3);
+      expect(typeLeft(s, 'Margherita')).toBe(0);
       s = setLeft(null);
-      expect(typeLeft(s, 'Margherita')).toBeNull();
-      // Nothing sold yet and nothing left is still sold out, not "no limit".
+      expect(kitchenLeft(s, 'Margherita')).toBeNull();
+      // Nothing made and nothing left is sold out, not "no limit".
       expect(leftChange(0, 0)).toEqual({ max: 0, soldOut: true });
+      s = applyAction(s, { type: 'type-limit', name: 'Margherita', soldOut: true });
+      expect(kitchenLeft(s, 'Margherita')).toBe(0);
     });
 
     it('keeps counting pizzas from orders cleared from the list', () => {

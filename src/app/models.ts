@@ -141,14 +141,35 @@ export function typeLeft(state: QueueState, name: string): number | null {
   return item.max ? Math.max(0, item.max - typeSold(state, name)) : null;
 }
 
+/** Pizzas of one type the kitchen has prepared (or that are further along). */
+export function typeMade(state: QueueState, name: string): number {
+  const waiting = state.orders
+    .filter((o) => o.status !== 'cancelled')
+    .flatMap((o) => o.items.filter((i) => i.name === name))
+    .reduce((n, i) => n + i.units.filter((u) => u === 'new').length, 0);
+  return typeSold(state, name) - waiting;
+}
+
 /**
- * The change that leaves `left` pizzas of a type to sell: the maximum becomes what's sold plus
- * what's left. Nothing left marks it sold out, more puts it back on sale, null means no limit.
+ * What the kitchen can still make of one type with the ingredients left, counting ordered
+ * pizzas it hasn't prepared yet: 0 when marked sold out without a maximum, null with no limit.
  */
-export function leftChange(sold: number, left: number | null): { max: number; soldOut: boolean } {
+export function kitchenLeft(state: QueueState, name: string): number | null {
+  const item = state.menu.find((m) => m.name === name);
+  if (!item) return null;
+  if (item.max) return Math.max(0, item.max - typeMade(state, name));
+  return item.soldOut ? 0 : null;
+}
+
+/**
+ * The change when the kitchen says it can still make `left` of a type: the maximum becomes
+ * what it has prepared plus that, which also puts a sold-out pizza back on sale. Null means
+ * no limit.
+ */
+export function leftChange(made: number, left: number | null): { max: number; soldOut: boolean } {
   if (left === null) return { max: 0, soldOut: false };
-  const n = Math.max(0, Math.min(MAX_PIZZAS, Math.floor(left)));
-  return { max: n > 0 ? sold + n : sold, soldOut: n === 0 };
+  const max = made + Math.max(0, Math.min(MAX_PIZZAS, Math.floor(left)));
+  return { max, soldOut: max === 0 };
 }
 
 /** Whether these pizzas fit under the total limit and each type's maximum. */

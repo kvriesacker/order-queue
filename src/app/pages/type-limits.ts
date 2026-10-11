@@ -1,17 +1,18 @@
 import { Component, computed, inject } from '@angular/core';
-import { typeSold } from '../models';
+import { kitchenLeft, typeSold } from '../models';
 import { QueueService } from '../queue.service';
 
 /**
- * For the kitchen: how many of each pizza can still be sold, to change as ingredients run
- * low. The maximum follows: what's already sold plus what's left.
+ * For the kitchen: how many of each pizza it can still make, to change as ingredients run
+ * low. Ordered pizzas it hasn't prepared yet count as part of that, so the kitchen just counts
+ * its ingredients. The maximum follows: what's prepared plus what's left.
  */
 @Component({
   selector: 'app-type-limits',
   template: `
     <ul class="type-limits">
       @for (t of types(); track t.name) {
-        <li [class.out]="t.left === 0">
+        <li [class.out]="t.sellable === 0">
           <span class="type-name" [style.border-left-color]="t.color">{{ t.name }}</span>
           <span class="type-count muted">{{ t.sold }} sold</span>
           <span class="type-left-edit">
@@ -44,10 +45,14 @@ import { QueueService } from '../queue.service';
               +
             </button>
           </span>
-          @if (t.left === 0) {
+          @if (t.sellable === 0) {
             <strong class="type-out">Sold out</strong>
           } @else {
-            <button class="btn small danger" type="button" (click)="queue.setTypeLeft(t.name, 0)">
+            <button
+              class="btn small danger"
+              type="button"
+              (click)="queue.setTypeLimit(t.name, { soldOut: true })"
+            >
               Sold out
             </button>
           }
@@ -62,7 +67,8 @@ import { QueueService } from '../queue.service';
       }
     </ul>
     <p class="muted small">
-      Type how many you can still make, or leave it empty for no limit. 0 is sold out.
+      Type how many you can still make, counting the ordered pizzas you haven’t prepared yet.
+      Leave it empty for no limit.
     </p>
   `,
 })
@@ -78,7 +84,10 @@ export class TypeLimits {
         name: m.name,
         color: m.color,
         sold: typeSold(state, m.name),
-        left: left.get(m.name) ?? null,
+        /** What the kitchen can still make, including ordered pizzas not prepared yet. */
+        left: kitchenLeft(state, m.name),
+        /** What the order takers can still sell. */
+        sellable: left.get(m.name) ?? null,
       }));
   });
 

@@ -13,7 +13,7 @@ import {
   outranks,
   pizzasLeft,
   typeLeft,
-  typeSold,
+  typeMade,
   leftChange,
   randomId,
 } from './models';
@@ -242,15 +242,13 @@ export class QueueService {
     this.dispatch({ type: 'type-limit', name, ...change });
   }
 
-  /** Sets how many of one pizza can still be sold (null: no limit), as the kitchen sees it. */
+  /**
+   * Sets how many of one pizza the kitchen can still make (null: no limit); ordered pizzas
+   * it hasn't prepared yet count as part of that.
+   */
   setTypeLeft(name: string, left: number | null): void {
     const state = this.state();
-    if (!state) return;
-    // This device's unsent orders will count as sold too.
-    const unsent = this.pending()
-      .flatMap((a) => (a.type === 'add' ? a.items : []))
-      .reduce((n, i) => n + (i.name === name ? i.qty : 0), 0);
-    this.setTypeLimit(name, leftChange(typeSold(state, name) + unsent, left));
+    if (state) this.setTypeLimit(name, leftChange(typeMade(state, name), left));
   }
 
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
