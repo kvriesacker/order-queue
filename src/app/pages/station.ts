@@ -26,6 +26,7 @@ const STATIONS = {
     to: 'prepared' as PizzaStatus,
     action: 'Prepared',
     done: '✓ Prepared',
+    recent: 'Just prepared',
   },
   oven: {
     title: 'For the oven',
@@ -34,6 +35,7 @@ const STATIONS = {
     to: 'baked' as PizzaStatus,
     action: 'Baked',
     done: '✓ Baked',
+    recent: 'Just baked',
   },
 };
 
@@ -112,6 +114,30 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
         </div>
       </section>
       <section class="column narrow">
+        <h2>{{ config().recent }}</h2>
+        <ul class="recent">
+          @for (r of recent(); track r.order.id + '-' + r.item + '-' + r.unit) {
+            <li>
+              <span class="recent-who">
+                <strong>#{{ r.order.number }}</strong>
+                <span class="chip" [style.background]="r.color" [style.color]="textOn(r.color)">{{
+                  r.name
+                }}</span>
+              </span>
+              <span class="muted recent-age">{{ ago(r.at) }}</span>
+              <button
+                class="btn ghost small"
+                type="button"
+                (click)="set(r.order, r, config().from)"
+                [attr.aria-label]="'Undo ' + r.name + ' of order ' + r.order.number"
+              >
+                Undo
+              </button>
+            </li>
+          } @empty {
+            <li class="muted">Nothing yet.</li>
+          }
+        </ul>
         @if (station() === 'kitchen') {
           <h2>
             Coming up for the oven <span class="count">{{ forOven().length }}</span>
@@ -170,6 +196,23 @@ export class Station {
       .filter((e) => e.todo > 0)
       .map((e) => ({ ...e, done: e.pizzas.filter((p) => isPast(p.status, to)).length }));
   });
+  /**
+   * The pizzas this station marked most recently that are still at its step, newest first,
+   * so a mistake can be undone after the order has left the list.
+   */
+  protected recent = computed(() => {
+    const { to } = this.config();
+    return this.queue
+      .orders()
+      .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
+      .flatMap((order) =>
+        pizzaRows(order)
+          .filter((p) => p.status === to)
+          .map((p) => ({ ...p, order, at: order.items[p.item].times[p.unit]?.[to as 'prepared' | 'baked'] ?? 0 })),
+      )
+      .sort((a, b) => b.at - a.at)
+      .slice(0, RECENT);
+  });
   protected waiting = computed(() => this.active().reduce((n, e) => n + e.todo, 0));
 
   /** For the kitchen: orders it has finished that are still with the oven. */
@@ -194,11 +237,19 @@ export class Station {
     return 'other';
   }
 
+  ago(at: number): string {
+    const minutes = Math.floor((this.queue.now() - at) / 60000);
+    return !at || minutes < 1 ? 'just now' : `${minutes} min ago`;
+  }
+
   age(order: Order): string {
     const minutes = Math.floor((this.queue.now() - order.createdAt) / 60000);
     return minutes < 1 ? 'just now' : `${minutes} min`;
   }
 }
+
+/** How many recently marked pizzas each station sees, to undo a mistake. */
+const RECENT = 6;
 
 const ORDER: PizzaStatus[] = ['new', 'prepared', 'baked'];
 
