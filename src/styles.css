@@ -1538,3 +1538,8 @@ input.swatch {
 .oven-state {
   font-size: 0.8rem;
 }
+/* With a wider font the button drops to its own line instead of pushing the page wider. */
+.oven {
+  flex-wrap: wrap;
+  min-width: 0;
+}
