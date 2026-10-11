@@ -1492,59 +1492,35 @@ input.swatch {
 }
 
 /* Oven station: the ovens */
-.ovens-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.7rem;
-  margin-bottom: 0.6rem;
+.ovens-list {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 .oven {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
   background: #fff;
   border: 1px solid var(--line);
-  border-top: 6px solid var(--crust);
-  border-radius: 12px;
-  padding: 0.7rem 0.8rem;
-}
-.oven.full {
-  border-top-color: var(--tomato);
+  border-left: 6px solid var(--basil);
+  border-radius: 10px;
+  padding: 0.4rem 0.6rem;
 }
 .oven.broken {
-  border-top-color: #8a8a8a;
-  background: #f1eeec;
+  border-left-color: var(--tomato);
+  background: #fdeceb;
 }
-.oven header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-.oven header strong {
-  font-size: 1.15rem;
-}
-.oven-count {
+.oven-state {
   font-weight: 700;
-  color: var(--muted);
-}
-.oven.broken .oven-count {
+  font-size: 0.85rem;
   color: var(--tomato-dark);
 }
-.oven-pizzas {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-.oven-pizzas .chip {
-  font-size: 0.85rem;
-  padding: 0.25rem 0.5rem;
-}
 .oven > .btn {
-  align-self: flex-start;
+  margin-left: auto;
 }
 .oven-waiting {
   font-weight: 600;
@@ -1553,4 +1529,12 @@ input.swatch {
 }
 .qr-again {
   align-self: flex-start;
+}
+.oven strong,
+.oven-state,
+.oven > .btn {
+  white-space: nowrap;
+}
+.oven-state {
+  font-size: 0.8rem;
 }

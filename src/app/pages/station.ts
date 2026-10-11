@@ -52,10 +52,6 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
   template: `
     <main class="page kitchen">
       <section class="column">
-        @if (station() === 'oven') {
-          <h2>Ovens</h2>
-          <app-ovens />
-        }
         <h2>
           {{ config().title }} <span class="count">{{ waiting() }}</span>
         </h2>
@@ -143,6 +139,10 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
             <li class="muted">Nothing yet.</li>
           }
         </ul>
+        @if (station() === 'oven') {
+          <h2>Ovens</h2>
+          <app-ovens />
+        }
         @if (station() === 'kitchen') {
           <h2>
             Coming up for the oven <span class="count">{{ forOven().length }}</span>
