@@ -529,9 +529,22 @@ input:focus {
   letter-spacing: 0.05em;
   margin-bottom: 1.5rem;
 }
-.display-col.preparing {
-  background: #2a201c;
+.display-col.ordered,
+.display-col.preparing,
+.display-col.baking {
   color: #d9c8bb;
+}
+.display-col.ordered {
+  background: #2a201c;
+}
+.display-col.preparing {
+  background: #30241f;
+}
+.display-col.baking {
+  background: #382420;
+}
+.display-col.baking h2 {
+  color: var(--crust);
 }
 @keyframes pop {
   0%,
@@ -796,9 +809,54 @@ input.swatch {
   }
 }
 
-/* Customer screen: orders being made */
+/* Customer screen: four blocks, from ordered to ready */
 .display {
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+}
+.display-col {
+  padding: 1.5rem 1.2rem;
+  min-width: 0;
+}
+.display-col h2 {
+  font-size: clamp(1.2rem, 2.2vw, 2.2rem);
+}
+/* Size rows by their block, not the screen, so four blocks side by side still fit. */
+.display-col {
+  container-type: inline-size;
+}
+.display-col .prep-num {
+  font-size: clamp(1.6rem, 11cqi, 3rem);
+}
+.display-col .prep-who strong {
+  font-size: clamp(1rem, 7cqi, 1.7rem);
+}
+.display-col .prep-pizzas {
+  font-size: clamp(0.85rem, 5cqi, 1.2rem);
+}
+.display-col .prep-eta {
+  font-size: clamp(1.1rem, 6.5cqi, 2.2rem);
+}
+/* In a narrow block the time goes under the name instead of beside it. */
+@container (max-width: 320px) {
+  .display-col .prep-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 0.1rem;
+  }
+  .display-col .prep-list .prep-eta {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .display-col .prep-list li:has(.prep-eta) .prep-num {
+    grid-row: span 2;
+  }
+}
+@media (max-width: 1100px) {
+  .display {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 1fr 1fr auto;
+  }
 }
 .prep-list {
   list-style: none;
@@ -873,6 +931,17 @@ input.swatch {
 @media (max-width: 700px) {
   .display {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+  /* On a phone, closest to done comes first. */
+  .display-col.baking {
+    order: -2;
+  }
+  .display-col.ready {
+    order: -3;
+  }
+  .display-col.preparing {
+    order: -1;
   }
 }
 

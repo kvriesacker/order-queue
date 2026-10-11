@@ -266,6 +266,23 @@ export function kitchenStatus(items: OrderItem[]): OrderStatus {
   return 'in-progress';
 }
 
+/** The block an order shows in on the customer screen. */
+export type DisplayStage = 'ordered' | 'preparing' | 'baking' | 'ready';
+
+/**
+ * An order moves to the next block as soon as its first pizza does: "Being prepared" once the
+ * kitchen has prepared one pizza, "Baking" once all are prepared (in the oven) or one is baked,
+ * and "Ready" once the counter calls it. Finished and cancelled orders show nowhere.
+ */
+export function displayStage(order: Order): DisplayStage | null {
+  if (order.status === 'ready-for-customer') return 'ready';
+  if (order.status === 'collected' || order.status === 'cancelled') return null;
+  const units = order.items.flatMap((i) => i.units);
+  if (units.some((u) => u === 'baked') || units.every((u) => u !== 'new')) return 'baking';
+  if (units.some((u) => u === 'prepared')) return 'preparing';
+  return 'ordered';
+}
+
 /** Records when a pizza reached a step; going back clears the later steps. */
 function stampTimes(times: PizzaTimes, status: PizzaStatus, now: number): PizzaTimes {
   if (status === 'new') return {};

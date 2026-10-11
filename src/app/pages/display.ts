@@ -2,51 +2,49 @@ import { Component, computed, effect, inject, input, signal, untracked } from '@
 import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
+import { DisplayStage, Order, displayStage } from '../models';
+
+const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
+  { stage: 'ordered', title: 'Ordered', empty: 'No new orders.' },
+  { stage: 'preparing', title: 'Being prepared', empty: 'Nothing being prepared.' },
+  { stage: 'baking', title: 'Baking', empty: 'Nothing in the oven.' },
+  { stage: 'ready', title: 'Ready! Please collect', empty: '' },
+];
 
 /**
- * Customer-facing screen: each order being made with the customer's name, its pizzas and
- * estimated time, and big numbers for orders ready to collect.
+ * Customer-facing screen: orders in four blocks (ordered, being prepared, baking, ready), each
+ * with the customer's name and pizzas, and the estimated time until it's ready.
  */
 @Component({
   selector: 'app-display',
   imports: [RouterLink],
   template: `
     <main class="display" (dblclick)="fullscreen()">
-      <section class="display-col preparing">
-        <h2>Preparing</h2>
-        <ol class="prep-list">
-          @for (p of preparing(); track p.number) {
-            <li>
-              <span class="prep-num">{{ p.number }}</span>
-              <span class="prep-who">
-                <strong>{{ p.name || 'Order ' + p.number }}</strong>
-                <span class="prep-pizzas">{{ p.pizzas }}</span>
-              </span>
-              @if (p.eta) {
-                <span class="prep-eta"
-                  >{{ clock(p.eta) }}<small>{{ until(p.eta) }}</small></span
-                >
+      @for (col of columns(); track col.stage) {
+        <section class="display-col" [class]="col.stage">
+          <h2>{{ col.title }}</h2>
+          <ol class="prep-list" [class.ready-list]="col.stage === 'ready'">
+            @for (p of col.orders; track p.id) {
+              <li [class.fresh]="col.stage === 'ready' && p.number === freshest()">
+                <span class="prep-num">{{ p.number }}</span>
+                <span class="prep-who">
+                  <strong>{{ p.name || 'Order ' + p.number }}</strong>
+                  <span class="prep-pizzas">{{ p.pizzas }}</span>
+                </span>
+                @if (col.stage !== 'ready' && p.eta) {
+                  <span class="prep-eta"
+                    >{{ clock(p.eta) }}<small>{{ until(p.eta) }}</small></span
+                  >
+                }
+              </li>
+            } @empty {
+              @if (col.empty) {
+                <li class="prep-empty">{{ col.empty }}</li>
               }
-            </li>
-          } @empty {
-            <li class="prep-empty">No orders waiting.</li>
-          }
-        </ol>
-      </section>
-      <section class="display-col ready">
-        <h2>Ready! Please collect</h2>
-        <ol class="prep-list ready-list">
-          @for (o of readyOrders(); track o.id) {
-            <li [class.fresh]="o.number === freshest()">
-              <span class="prep-num">{{ o.number }}</span>
-              <span class="prep-who">
-                <strong>{{ o.customer || 'Order ' + o.number }}</strong>
-                <span class="prep-pizzas">{{ summary(o) }}</span>
-              </span>
-            </li>
-          }
-        </ol>
-      </section>
+            }
+          </ol>
+        </section>
+      }
       <footer class="display-footer">
         <span
           >{{ queue.state()?.name }}
@@ -84,17 +82,22 @@ export class Display {
   );
   protected ready = computed(() => this.readyOrders().map((o) => o.number));
   protected freshest = computed(() => this.ready()[0]);
-  protected preparing = computed(() =>
-    this.queue
-      .orders()
-      .filter((o) => o.status === 'new' || o.status === 'in-progress' || o.status === 'ready')
-      .map((o) => ({
-        number: o.number,
-        name: o.customer,
-        pizzas: pizzaSummary(o),
-        eta: this.queue.estimates().get(o.id),
-      })),
-  );
+  protected columns = computed(() => {
+    const estimates = this.queue.estimates();
+    const row = (o: Order) => ({
+      id: o.id,
+      number: o.number,
+      name: o.customer,
+      pizzas: pizzaSummary(o),
+      eta: estimates.get(o.id),
+    });
+    const inStage = (stage: DisplayStage) =>
+      this.queue.orders().filter((o) => displayStage(o) === stage);
+    return COLUMNS.map((c) => ({
+      ...c,
+      orders: (c.stage === 'ready' ? this.readyOrders() : inStage(c.stage)).map(row),
+    }));
+  });
 
   private seen = new Set<number>();
   private primed = false;

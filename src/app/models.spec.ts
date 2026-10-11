@@ -1,4 +1,4 @@
-import { QueueAction, QueueState, applyAction, normalizeState, outranks, pizzasLeft } from './models';
+import { Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks, pizzasLeft } from './models';
 
 describe('applyAction', () => {
   const empty: QueueState = {
@@ -134,5 +134,28 @@ describe('applyAction', () => {
     let s = applyAction(empty, add('a'));
     s.orders[0].items[0].units = ['in-progress', 'ready'] as never;
     expect(normalizeState(s).orders[0].items[0].units).toEqual(['prepared', 'baked']);
+  });
+});
+
+describe('displayStage', () => {
+  function order(units: PizzaStatus[], status: Order['status'] = 'in-progress'): Order {
+    return {
+      id: 'o', number: 1, customer: '', note: '', status, createdAt: 0, updatedAt: 0,
+      items: [{ name: 'Margherita', qty: units.length, note: '', color: '', units, times: [] }],
+    };
+  }
+
+  it('moves an order on as soon as its first pizza moves', () => {
+    expect(displayStage(order(['new', 'new'], 'new'))).toBe('ordered');
+    expect(displayStage(order(['prepared', 'new']))).toBe('preparing');
+    expect(displayStage(order(['prepared', 'prepared']))).toBe('baking');
+    expect(displayStage(order(['baked', 'new']))).toBe('baking');
+    expect(displayStage(order(['baked', 'baked'], 'ready'))).toBe('baking');
+    expect(displayStage(order(['baked'], 'ready-for-customer'))).toBe('ready');
+  });
+
+  it('hides picked-up and cancelled orders', () => {
+    expect(displayStage(order(['baked'], 'collected'))).toBeNull();
+    expect(displayStage(order(['new'], 'cancelled'))).toBeNull();
   });
 });
