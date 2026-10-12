@@ -39,6 +39,11 @@ test('sponsors set in Settings take turns on the customer screens', async ({ pag
   await expect(banner).toContainText('With thanks to');
   await expect(banner).toContainText(/Bakkerij Jansens\s*Vers brood elke dag|Garage Peeters/);
   const first = await banner.locator('.sponsor-name').textContent();
+  // The slogan goes on a second line, under the name.
+  await expect(display.locator('.sponsor-message')).toHaveText('Vers brood elke dag', { timeout: 8000 });
+  const name = (await display.locator('.sponsor-name').boundingBox())!;
+  const slogan = (await display.locator('.sponsor-message').boundingBox())!;
+  expect(slogan.y).toBeGreaterThanOrEqual(name.y + name.height - 1);
   await expect(banner.locator('.sponsor-name')).not.toHaveText(first!, { timeout: 5000 });
 
   // The order point's customer screen shows them too.

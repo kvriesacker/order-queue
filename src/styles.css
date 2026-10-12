@@ -2076,6 +2076,8 @@ app-install {
   color: #f2b84b;
 }
 .sponsor-message {
+  /* The slogan on its own line, under the name. */
+  flex-basis: 100%;
   font-size: clamp(1rem, 1.8vw, 1.5rem);
 }
 .os-sponsor .sponsor-banner {
