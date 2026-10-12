@@ -145,6 +145,26 @@ describe('applyAction', () => {
     expect(applyAction(s, { type: 'lang', lang: 'fr' as 'en' })).toBe(s);
   });
 
+  it('keeps the sponsors for the customer screens, trimmed, with a sensible interval', () => {
+    expect(normalizeState(empty)).toMatchObject({ sponsors: [], sponsorSeconds: 10 });
+    const s = applyAction(empty, {
+      type: 'sponsors',
+      sponsors: [
+        { name: '  Bakkerij Jansens ', message: ' Vers brood elke dag ' },
+        { name: '   ', message: 'no name' },
+        { name: 'Garage Peeters', message: '' },
+      ],
+      seconds: 15,
+    });
+    expect(s.sponsors).toEqual([
+      { name: 'Bakkerij Jansens', message: 'Vers brood elke dag' },
+      { name: 'Garage Peeters', message: '' },
+    ]);
+    expect(s.sponsorSeconds).toBe(15);
+    expect(applyAction(s, { type: 'sponsors', sponsors: [], seconds: 1 })).toMatchObject({ sponsors: [], sponsorSeconds: 10 });
+    expect(normalizeState({ ...s, sponsors: 'x' } as unknown as QueueState).sponsors).toEqual([]);
+  });
+
   it('charges the general price unless a pizza has its own, as set when ordered', () => {
     let s: QueueState = {
       ...empty,

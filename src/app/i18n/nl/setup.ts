@@ -75,4 +75,14 @@ export const NL_SETUP: Record<string, string> = {
   'at once': 'tegelijk',
   'The ovens limit how many pizzas bake at once. The times are starting estimates. As pizzas get prepared, baked and called, each phase follows the real times.':
     "De ovens bepalen hoeveel pizza's tegelijk bakken. De tijden zijn startschattingen. Naarmate pizza's belegd, gebakken en afgeroepen worden, volgt elke fase de echte tijden.",
+  // Sponsors (Settings and the customer screens)
+  Sponsors: 'Sponsors',
+  'The customer screens show these one after another, with an optional message. Leave the list empty to show none.':
+    'De klantenschermen tonen deze om beurten, met een optionele boodschap. Laat de lijst leeg om er geen te tonen.',
+  'Sponsor name': 'Naam van de sponsor',
+  Message: 'Boodschap',
+  'Remove sponsor {n}': 'Sponsor {n} verwijderen',
+  '+ Add sponsor': '+ Sponsor toevoegen',
+  'Show each sponsor for (seconds)': 'Elke sponsor tonen gedurende (seconden)',
+  'With thanks to': 'Met dank aan',
 };

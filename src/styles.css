@@ -512,7 +512,7 @@ select:focus {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 2fr;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   background: #1b1412;
   color: #fff;
 }
@@ -868,7 +868,7 @@ input.swatch {
 @media (max-width: 1100px) {
   .display {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: 1fr 1fr auto;
+    grid-template-rows: 1fr 1fr auto auto;
   }
   .display-col.ready {
     grid-column: span 2;
@@ -2046,4 +2046,75 @@ app-install {
 }
 .recent-oven {
   font-size: 0.8rem;
+}
+
+/* Sponsors on the customer screens, one at a time */
+.display-sponsor {
+  grid-column: 1 / -1;
+}
+.sponsor-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.4rem 1rem;
+  padding: 0.9rem 1.5rem;
+  background: #2b1f17;
+  border-top: 2px solid #f2b84b;
+  color: #f5e9dd;
+  text-align: center;
+  animation: sponsor-in 0.6s ease-out;
+}
+.sponsor-thanks {
+  font-size: clamp(0.8rem, 1.2vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #b9a79a;
+}
+.sponsor-name {
+  font-size: clamp(1.3rem, 2.6vw, 2.2rem);
+  color: #f2b84b;
+}
+.sponsor-message {
+  font-size: clamp(1rem, 1.8vw, 1.5rem);
+}
+.os-sponsor .sponsor-banner {
+  margin: 1rem calc(-1 * clamp(1rem, 4vw, 3rem)) 0;
+}
+@keyframes sponsor-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-banner {
+    animation: none;
+  }
+}
+/* Sponsors in Settings */
+.sponsor-editor {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.sponsor-editor li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+@media (max-width: 560px) {
+  .sponsor-editor li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sponsor-editor li label:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+.sponsor-seconds input {
+  max-width: 8rem;
 }

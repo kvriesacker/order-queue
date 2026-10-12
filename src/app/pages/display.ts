@@ -19,9 +19,10 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
  * Each pizza is where it is, so one order can show in several blocks at once.
  */
 import { Unlock } from './unlock';
+import { SponsorBanner } from './sponsor-banner';
 @Component({
   selector: 'app-display',
-  imports: [Unlock, RouterLink, T],
+  imports: [Unlock, RouterLink, T, SponsorBanner],
   template: `
     @if (queue.lock() !== 'open') {
       <app-unlock />
@@ -58,6 +59,7 @@ import { Unlock } from './unlock';
           </ol>
         </section>
       }
+      <app-sponsor-banner class="display-sponsor" />
       <footer class="display-footer">
         <span
           >{{ queue.state()?.name }}

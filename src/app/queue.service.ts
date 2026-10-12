@@ -27,6 +27,7 @@ import {
   typeMade,
   leftChange,
   randomId,
+  Sponsor,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
@@ -402,6 +403,10 @@ export class QueueService {
 
   setTiming(timing: Timing): void {
     this.dispatch({ type: 'timing', timing });
+  }
+
+  setSponsors(sponsors: Sponsor[], seconds: number): void {
+    this.dispatch({ type: 'sponsors', sponsors, seconds });
   }
 
   /** Changes one pizza type's maximum or sold-out mark; anyone on staff (the kitchen) may. */

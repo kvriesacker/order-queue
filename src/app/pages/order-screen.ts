@@ -22,9 +22,10 @@ export const ALMOST_GONE = 5;
  * total) almost sold out marked, so customers know before they ask. Made for full screen.
  */
 import { Unlock } from './unlock';
+import { SponsorBanner } from './sponsor-banner';
 @Component({
   selector: 'app-order-screen',
-  imports: [Unlock, RouterLink, T],
+  imports: [Unlock, RouterLink, T, SponsorBanner],
   template: `
     @if (queue.lock() !== 'open') {
       <app-unlock />
@@ -129,6 +130,7 @@ import { Unlock } from './unlock';
           </ul>
         </section>
       }
+      <app-sponsor-banner class="os-sponsor" />
       <footer class="os-footer">
         @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
           <span class="pill offline">{{ 'Offline' | t }}</span>

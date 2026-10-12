@@ -81,6 +81,34 @@ export interface QueueState {
   hostId: string;
   /** Language for devices that join and for customer screens; Dutch when missing. */
   lang?: 'nl' | 'en';
+  /** Sponsors the customer screens show one after another; none when missing. */
+  sponsors?: Sponsor[];
+  /** Seconds each sponsor stays on the customer screens before the next one. */
+  sponsorSeconds?: number;
+}
+
+/** A sponsor on the customer screens: a name, and optionally a short message. */
+export interface Sponsor {
+  name: string;
+  message: string;
+}
+
+export const DEFAULT_SPONSOR_SECONDS = 10;
+export const MAX_SPONSORS = 30;
+
+/** Sponsors as the screens can show them: names and messages trimmed and kept short. */
+export function cleanSponsors(sponsors: unknown): Sponsor[] {
+  if (!Array.isArray(sponsors)) return [];
+  const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  return sponsors
+    .map((s) => ({ name: text(s?.name, 60), message: text(s?.message, 140) }))
+    .filter((s) => s.name)
+    .slice(0, MAX_SPONSORS);
+}
+
+/** Seconds per sponsor: a whole number from 3 to 600, the default otherwise. */
+export function cleanSponsorSeconds(n: unknown): number {
+  return typeof n === 'number' && n >= 3 && n <= 600 ? Math.round(n) : DEFAULT_SPONSOR_SECONDS;
 }
 
 /**
@@ -234,6 +262,8 @@ export type QueueAction =
   | { type: 'timing'; timing: Timing }
   /** The default language for devices that join and for customer screens. */
   | { type: 'lang'; lang: 'nl' | 'en' }
+  /** The sponsors the customer screens show in turn, and for how long each. */
+  | { type: 'sponsors'; sponsors: Sponsor[]; seconds: number }
   /** The counter shows one baked pizza on the customer screen (or takes that back). */
   | { type: 'call'; id: string; item: number; unit: number; called: boolean }
   /** The counter gives one pizza from the customer screen to the customer (or takes that back). */
@@ -423,6 +453,12 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
     }
     case 'lang':
       return action.lang === 'nl' || action.lang === 'en' ? { ...state, lang: action.lang } : state;
+    case 'sponsors':
+      return {
+        ...state,
+        sponsors: cleanSponsors(action.sponsors),
+        sponsorSeconds: cleanSponsorSeconds(action.seconds),
+      };
     case 'timing': {
       const minutes = (n: unknown, fallback: number) =>
         typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
@@ -670,9 +706,11 @@ export function normalizeState(state: QueueState): QueueState {
   const hostId = typeof state.hostId === 'string' ? state.hostId : '';
   // Queues from before languages speak Dutch, the default.
   const lang = state.lang === 'en' ? 'en' : 'nl';
+  const sponsors = cleanSponsors(state.sponsors);
+  const sponsorSeconds = cleanSponsorSeconds(state.sponsorSeconds);
   return {
     id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, ovensOut,
-    hostEpoch, hostId, lang,
+    hostEpoch, hostId, lang, sponsors, sponsorSeconds,
   };
 }
 

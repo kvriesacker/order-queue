@@ -1,5 +1,8 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { DEFAULT_TIMING, MenuItem, QueueState, Timing, pizzasLeft, pizzasSold } from '../models';
+import {
+  DEFAULT_SPONSOR_SECONDS, DEFAULT_TIMING, MenuItem, QueueState, Sponsor, Timing, cleanSponsors, pizzasLeft,
+  pizzasSold,
+} from '../models';
 import { QueueService } from '../queue.service';
 import { phaseTimes } from '../estimate';
 import { MenuEditor } from './menu-editor';
@@ -48,6 +51,39 @@ import { Lang, T, isLang } from '../i18n/i18n';
             }}
           </p>
         }
+        <h2>{{ 'Sponsors' | t }}</h2>
+        <p class="hint">
+          {{ 'The customer screens show these one after another, with an optional message. Leave the list empty to show none.' | t }}
+        </p>
+        <ul class="sponsor-editor">
+          @for (s of sponsors(); track $index; let i = $index) {
+            <li>
+              <label>
+                {{ 'Sponsor name' | t }}
+                <input name="sponsor-name" [value]="s.name" (input)="editSponsor(i, 'name', $event)" maxlength="60" />
+              </label>
+              <label>
+                {{ 'Message' | t }} <span class="muted">{{ '(optional)' | t }}</span>
+                <input name="sponsor-message" [value]="s.message" (input)="editSponsor(i, 'message', $event)"
+                  maxlength="140" />
+              </label>
+              <button class="btn ghost small" type="button" (click)="removeSponsor(i)"
+                [attr.aria-label]="'Remove sponsor {n}' | t: { n: i + 1 }">
+                {{ 'Remove' | t }}
+              </button>
+            </li>
+          }
+        </ul>
+        <div class="toolbar">
+          <button class="btn small" type="button" (click)="addSponsor()" [disabled]="sponsors().length >= 30">
+            {{ '+ Add sponsor' | t }}
+          </button>
+        </div>
+        <label class="sponsor-seconds">
+          {{ 'Show each sponsor for (seconds)' | t }}
+          <input type="number" name="sponsor-seconds" min="3" max="600" [value]="sponsorSeconds()"
+            (input)="sponsorSeconds.set(+$any($event.target).value)" />
+        </label>
         <div class="toolbar">
           <button class="btn primary" type="button" (click)="save()" [disabled]="!dirty()">
             {{ 'Save settings' | t }}
@@ -65,6 +101,8 @@ export class MenuPage {
   protected menu = signal<MenuItem[]>([]);
   protected timing = signal<Timing>({ ...DEFAULT_TIMING });
   protected saved = signal(false);
+  protected sponsors = signal<Sponsor[]>([]);
+  protected sponsorSeconds = signal(DEFAULT_SPONSOR_SECONDS);
   /** The queue's settings as last loaded into the editor (or saved from it). */
   private base = signal<string | null>(null);
   /**
@@ -73,7 +111,7 @@ export class MenuPage {
    */
   protected dirty = computed(() => {
     const base = this.base();
-    return base !== null && base !== settingsJson(this.menu(), this.timing());
+    return base !== null && base !== this.json();
   });
   /** The phase times the estimates use right now, in minutes. */
   protected live = computed(() => {
@@ -116,18 +154,42 @@ export class MenuPage {
     if (!state) return;
     this.menu.set(state.menu);
     this.timing.set(state.timing);
-    this.base.set(settingsJson(state.menu, state.timing));
+    this.sponsors.set(state.sponsors ?? []);
+    this.sponsorSeconds.set(state.sponsorSeconds ?? DEFAULT_SPONSOR_SECONDS);
+    this.base.set(this.json());
+  }
+
+  /** Everything this page edits, to tell whether it changed. */
+  private json(): string {
+    return JSON.stringify({
+      menu: this.menu(),
+      timing: this.timing(),
+      sponsors: this.sponsors(),
+      seconds: this.sponsorSeconds(),
+    });
+  }
+
+  protected addSponsor() {
+    this.sponsors.update((list) => [...list, { name: '', message: '' }]);
+  }
+
+  protected removeSponsor(index: number) {
+    this.sponsors.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  protected editSponsor(index: number, field: keyof Sponsor, event: Event) {
+    const value = (event.target as HTMLInputElement).value;
+    this.sponsors.update((list) => list.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
   }
 
   save() {
     this.queue.setMenu(this.menu());
     this.queue.setTiming(this.timing());
-    this.base.set(settingsJson(this.menu(), this.timing()));
+    this.queue.setSponsors(cleanSponsors(this.sponsors()), this.sponsorSeconds());
+    // Blank rows are dropped when saved.
+    this.sponsors.set(cleanSponsors(this.sponsors()));
+    this.base.set(this.json());
     this.saved.set(true);
     setTimeout(() => this.saved.set(false), 2000);
   }
-}
-
-function settingsJson(menu: MenuItem[], timing: Timing): string {
-  return JSON.stringify({ menu, timing });
 }
