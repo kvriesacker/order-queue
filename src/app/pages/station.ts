@@ -55,7 +55,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
         <h2>
           {{ config().title }} <span class="count">{{ waiting() }}</span>
         </h2>
-        <div class="kitchen-grid" [class.one-column]="station() === 'kitchen'">
+        <div class="kitchen-grid one-column">
           @for (entry of active(); track entry.order.id) {
             <article class="order kitchen-order" [class]="entry.order.status">
               <header>
@@ -195,7 +195,7 @@ export class Station {
       .orders()
       .filter((o) => o.status === 'new' || o.status === 'in-progress')
       .map((order) => {
-        const pizzas = pizzaRows(order);
+        const pizzas = byType(pizzaRows(order), this.queue.state()?.menu ?? []);
         return { order, pizzas, todo: pizzas.filter((p) => p.status === from).length, done: 0 };
       })
       .filter((e) => e.todo > 0)
@@ -260,6 +260,21 @@ const ORDER: PizzaStatus[] = ['new', 'prepared', 'baked'];
 
 function isPast(status: PizzaStatus, step: PizzaStatus): boolean {
   return ORDER.indexOf(status) >= ORDER.indexOf(step);
+}
+
+/**
+ * An order's pizzas grouped by type, in menu order (pizzas not on the menu after those),
+ * so the same pizzas are made together. Pizzas of one type keep their order.
+ */
+export function byType<T extends { name: string }>(rows: T[], menu: { name: string }[]): T[] {
+  const rank = (name: string) => {
+    const i = menu.findIndex((m) => m.name === name);
+    return i < 0 ? menu.length : i;
+  };
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => rank(a.row.name) - rank(b.row.name) || a.row.name.localeCompare(b.row.name) || a.i - b.i)
+    .map((x) => x.row);
 }
 
 function pizzaRows(order: Order): PizzaRow[] {

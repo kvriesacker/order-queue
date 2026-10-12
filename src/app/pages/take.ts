@@ -48,19 +48,26 @@ import { OrderCard } from './order-card';
         <div class="menu">
           @for (pizza of menu(); track pizza.name) {
             @let typeLeft = typeLeftAfterCart(pizza.name);
+            @let inOrder = inCart().get(pizza.name) ?? 0;
             <button
               class="menu-item"
               type="button"
               [style.border-left-color]="pizza.color"
               [class.sold-out]="typeLeft === 0"
+              [class.in-order]="inOrder > 0"
               [disabled]="!canAdd() || typeLeft === 0"
               (click)="add(pizza.name, pizza.color)"
             >
-              {{ pizza.name }}
-              @if (queue.typeLeft().get(pizza.name) === 0) {
-                <small class="type-left">Sold out</small>
-              } @else if (typeLeft !== null) {
-                <small class="type-left">{{ typeLeft }} left</small>
+              <span class="menu-item-name">
+                {{ pizza.name }}
+                @if (queue.typeLeft().get(pizza.name) === 0) {
+                  <small class="type-left">Sold out</small>
+                } @else if (typeLeft !== null) {
+                  <small class="type-left">{{ typeLeft }} left</small>
+                }
+              </span>
+              @if (inOrder > 0) {
+                <span class="in-order-count" [attr.aria-label]="inOrder + ' in this order'">{{ inOrder }}</span>
               }
             </button>
           }
@@ -293,6 +300,12 @@ export class Take {
     });
   }
 
+  /** How many of each pizza are in the order being taken, shown on its button. */
+  protected inCart = computed(() => {
+    const counts = new Map<string, number>();
+    for (const l of this.cart()) counts.set(l.name, (counts.get(l.name) ?? 0) + l.qty);
+    return counts;
+  });
   /** Pizzas that can still be sold, or null without a limit. */
   protected left = computed(() => this.queue.pizzasLeft());
   protected canAdd = computed(() => {
