@@ -117,6 +117,8 @@ function column(page: Page, title: string) {
 }
 
 test('the counter can show and hand over the baked pizzas of a big order before the rest is done', async ({ page, context }) => {
+  // A long walk through kitchen, oven, counter and screen: give it room on a busy machine.
+  test.setTimeout(60_000);
   await bigOrder(page);
   const queueId = page.url().split('/q/')[1].split('/')[0];
   await bake(page, 1);
@@ -144,6 +146,9 @@ test('the counter can show and hand over the baked pizzas of a big order before 
   await expect(block('Ready! Please collect')).toHaveText([/1\s*Anna\s*1× Margherita\s*Part of the order, the rest follows/]);
   await expect(block('Being prepared')).toHaveText([/1\s*Anna\s*1× Funghi, 1× Hawaii\s*Part of the order/]);
   await expect(block('Ordered')).toHaveText(['No new orders.']);
+  // Only part of the order is ready: yellow, not green.
+  await expect(block('Ready! Please collect')).toHaveClass(/partly/);
+  await expect(block('Ready! Please collect')).toHaveCSS('background-color', /^rgb\((242, 184, 75|247, 201, 95)\)$/);
 
   // Handed over: it leaves the Ready block. A mistake can be undone.
   await shown.getByRole('button', { name: 'Hand over Margherita' }).click();
@@ -160,6 +165,9 @@ test('the counter can show and hand over the baked pizzas of a big order before 
   await card.getByRole('button', { name: 'Ready for customer' }).click();
   await expect(fromKitchen.locator('app-order-card', { hasText: '#1' })).toHaveCount(0);
   await expect(block('Ready! Please collect')).toHaveText([/1× Funghi, 1× Hawaii\s*The rest was already handed over/]);
+  // The last pizzas are ready and the rest was already given: green again.
+  await expect(block('Ready! Please collect')).not.toHaveClass(/partly/);
+  await expect(block('Ready! Please collect')).toHaveCSS('background-color', /^rgb\((31, 122, 58|46, 155, 79)\)$/);
   // The whole order is on the screen now: no buttons per pizza, just Picked up.
   await expect(shown.locator('.counter-pizzas li')).toHaveText([/Margherita.*Handed over/, /Funghi/, /Hawaii/]);
   await expect(shown.getByRole('button', { name: /Hand over/ })).toHaveCount(0);

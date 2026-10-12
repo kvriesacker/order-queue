@@ -32,7 +32,10 @@ import { Unlock } from './unlock';
           <h2>{{ col.title | t }}</h2>
           <ol class="prep-list" [class.ready-list]="col.stage === 'ready'">
             @for (p of col.orders; track p.id) {
-              <li [class.fresh]="col.stage === 'ready' && p.number === freshest()">
+              <li
+                [class.fresh]="col.stage === 'ready' && p.number === freshest()"
+                [class.partly]="p.partly"
+              >
                 <span class="prep-num">{{ p.number }}</span>
                 <span class="prep-who">
                   <strong>{{ p.name || ('Order {n}' | t: { n: p.number }) }}</strong>
@@ -127,6 +130,8 @@ export class Display {
           return {
             ...this.row(p.order, p.byStage.get(c.stage)!),
             eta: c.stage === 'ready' ? undefined : estimates.get(p.order.id),
+            // Ready while more of the order is still coming: yellow instead of green.
+            partly: c.stage === 'ready' && elsewhere,
             // Part of a big order: say so, and what's still coming or already given.
             part:
               c.stage === 'ready'

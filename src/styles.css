@@ -1928,6 +1928,21 @@ app-install {
 .ready-list .prep-part {
   color: #fff3c4;
 }
+/* Ready, but the rest of the order isn't yet: yellow until the last pizzas are ready too. */
+.ready-list li.partly {
+  background: #f2b84b;
+}
+.ready-list li.partly.fresh {
+  background: #f7c95f;
+  box-shadow: 0 0 0 3px #ffe08a;
+}
+.ready-list li.partly,
+.ready-list li.partly .prep-num,
+.ready-list li.partly .prep-who strong,
+.ready-list li.partly .prep-pizzas,
+.ready-list li.partly .prep-part {
+  color: #2a1a0c;
+}
 
 /* Share link: QR code for other staff, with the link to copy */
 .share-dialog {
