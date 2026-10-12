@@ -68,6 +68,23 @@ describe('estimateReady', () => {
     expect(t.counter).toBe(1 * MIN);
   });
 
+  it('is not fooled by quick taps, such as when trying the app out', () => {
+    let s = queue();
+    for (let k = 0; k < 6; k++) {
+      const id = `o${k}`;
+      const at = T0 + k * 3000;
+      s = order(s, id, 1, at);
+      s = pizza(s, id, 0, 'prepared', at + 1000);
+      s = pizza(s, id, 0, 'baked', at + 2000);
+      s = applyAction(s, { type: 'status', id, status: 'ready-for-customer' }, at + 2500);
+    }
+    const t = phaseTimes(s, T0 + MIN);
+    // Pizzas "baked" within seconds don't count; the other phases go no lower than a third.
+    expect(t.bake).toBe(8 * MIN);
+    expect(t.prepare).toBe(1 * MIN);
+    expect(t.counter).toBe((2 * MIN) / 3);
+  });
+
   it('waits for room in the ovens and speeds up with more ovens', () => {
     const base = queue();
     base.timing = { ...base.timing, prepareMinutes: 1, ovens: 1, pizzasPerOven: 1 };

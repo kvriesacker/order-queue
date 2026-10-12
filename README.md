@@ -26,7 +26,7 @@ Every open order shows an estimated ready time on each screen, including the cus
 - **Bake**: each prepared pizza goes into the first free oven spot and bakes for the bake time. Settings say how many ovens there are and how many pizzas fit in each; when the ovens are full, pizzas wait their turn.
 - **Counter**: after an order's last pizza is baked, the counter needs a moment to call it.
 
-Settings give a starting time for each phase. As pizzas are marked prepared and baked and orders are called, each phase learns its real pace from the last hour, so a faster kitchen pulls every estimate earlier and a slow oven pushes them later. Settings shows the times in use right now.
+Settings give a starting time for each phase. As pizzas are marked prepared and baked and orders are called, each phase learns its real pace from the last hour, so a faster kitchen pulls every estimate earlier and a slow oven pushes them later. Settings shows the times in use right now. Taps that are too fast to be real (a pizza "baked" in a few seconds while trying the app out) are left out, and the learned times stay between a third of the setting and three times it.
 
 ## How syncing works
 

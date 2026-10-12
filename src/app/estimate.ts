@@ -48,19 +48,30 @@ export function phaseTimes(state: QueueState, now: number): PhaseTimes {
 
   return {
     prepare: blend(prepareGaps, setting('prepareMinutes')),
-    bake: blend(bakeTimes, setting('bakeMinutes')),
+    // Baking takes as long as it takes: a pizza "baked" within half the bake time was tapped
+    // too early (or while trying things out) and says nothing about the oven.
+    bake: blend(bakeTimes, setting('bakeMinutes'), 0.5),
     counter: blend(counterTimes, setting('counterMinutes')),
   };
 }
 
-/** Mixes measurements into the setting, ignoring outliers (pauses, forgotten taps). */
-function blend(samples: number[], setting: number): number {
-  const usable = samples.filter((s) => s >= 0 && s < setting * 4).slice(-12);
+/**
+ * Mixes measurements into the setting, ignoring outliers (pauses, forgotten taps, and taps
+ * faster than `shortest` times the setting). However fast or slow the taps, the result stays
+ * between a third of the setting and three times it, so a burst of quick taps (such as when
+ * trying the app out) can't make every estimate say "any minute".
+ */
+function blend(samples: number[], setting: number, shortest = 0): number {
+  const usable = samples.filter((s) => s >= setting * shortest && s < setting * 4).slice(-12);
   if (!usable.length) return setting;
   const measured = usable.reduce((a, b) => a + b, 0) / usable.length;
   const weight = Math.min(1, usable.length / FULL_TRUST);
-  return Math.max(MINUTE / 6, measured * weight + setting * (1 - weight));
+  const blended = measured * weight + setting * (1 - weight);
+  return Math.max(MINUTE / 6, Math.min(setting * MAX_FACTOR, Math.max(setting / MAX_FACTOR, blended)));
 }
+
+/** Measured times can make a phase at most this many times faster or slower than its setting. */
+const MAX_FACTOR = 3;
 
 /** How many pizzas fit at once in the ovens that work (0 when every oven is out of order). */
 export function ovenSlots(state: QueueState): number {
