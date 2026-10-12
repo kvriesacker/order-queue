@@ -50,7 +50,7 @@ export const ALMOST_GONE = 5;
             }
           </section>
           <section class="os-qr">
-            <div class="qr" [innerHTML]="b.qr"></div>
+            <div class="qr" [innerHTML]="b.qr.svg" [attr.data-link]="b.qr.link"></div>
             <p class="os-scan">{{ 'Scan me to follow your order' | t }}</p>
           </section>
         </div>
@@ -80,7 +80,7 @@ export const ALMOST_GONE = 5;
           </section>
           @if (c.qr) {
             <section class="os-qr">
-              <div class="qr" [innerHTML]="c.qr"></div>
+              <div class="qr" [innerHTML]="c.qr.svg" [attr.data-link]="c.qr.link"></div>
               <p class="os-scan">{{ 'Scan me to follow your order' | t }}</p>
             </section>
           }
@@ -232,10 +232,13 @@ export class OrderScreen {
   });
   protected almostGone = ALMOST_GONE;
 
-  /** The QR code is our own SVG made from our own link, so it's safe to insert. */
+  /**
+   * The QR code for the customer's follow page, with its link. It's our own SVG made from our
+   * own link, so it's safe to insert.
+   */
   private qr(orderId: string) {
-    const svg = renderSVG(this.queue.trackLink(orderId), { border: 2 });
-    return this.sanitizer.bypassSecurityTrustHtml(svg);
+    const link = this.queue.trackLink(orderId);
+    return { link, svg: this.sanitizer.bypassSecurityTrustHtml(renderSVG(link, { border: 2 })) };
   }
 
   constructor() {

@@ -1098,88 +1098,11 @@ input.swatch {
   }
 }
 
-/* A customer following their order on their phone */
-.track {
-  min-height: 100vh;
-  max-width: 30rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.track-shop {
-  font-weight: 800;
-  color: var(--tomato);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.track-label {
-  margin-top: 1rem;
-  color: var(--muted);
-}
-.track-number {
-  font-size: 6rem;
-  font-weight: 900;
-  line-height: 1;
-}
-.track.is-ready .track-number {
-  color: var(--tomato);
-}
-.track-name {
-  font-size: 1.5rem;
-  font-weight: 800;
-}
-.track-pizzas {
-  color: var(--muted);
-}
-.track-eta {
-  margin-top: 1rem;
-  font-size: 1.4rem;
-}
-.track-eta span {
-  display: block;
-  font-size: 1rem;
-  color: var(--muted);
-}
-.track-big {
-  margin-top: 1rem;
-  font-size: 1.5rem;
-  font-weight: 800;
-}
-.track-steps {
-  list-style: none;
-  padding: 0;
-  margin: 1.5rem 0 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.3rem;
-  font-size: 0.8rem;
-}
-.track-steps li {
-  padding-top: 0.6rem;
-  border-top: 6px solid var(--line);
-  color: var(--muted);
-}
-.track-steps li.done {
-  border-color: var(--tomato);
-  color: inherit;
-  font-weight: 700;
-}
-.track-foot {
-  margin-top: auto;
-  padding-top: 2rem;
-  font-size: 0.85rem;
-}
-:where(.order-screen, .track) p {
+.order-screen p {
   margin: 0;
 }
 .os-number {
   margin: 0.5rem 0 1rem;
-}
-.track-number {
-  margin: 0.3rem 0 0.6rem;
 }
 
 /* Pizzas still available */
@@ -1740,23 +1663,6 @@ app-install {
   margin-bottom: 1rem;
 }
 .install-hint {
-  margin: 0;
-}
-
-/* Order alerts for the customer */
-.track-alert {
-  margin: 0.8rem 0 0;
-  padding: 0.7rem 1rem;
-  border-radius: 12px;
-  background: var(--crust);
-  color: var(--ink);
-  font-weight: 700;
-  font-size: 1.2rem;
-}
-.track-alerts {
-  margin-top: 1rem;
-}
-.track-alerts p {
   margin: 0;
 }
 

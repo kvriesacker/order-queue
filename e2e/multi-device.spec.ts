@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { ENGLISH } from '../playwright.config';
+import { savedTrack } from './track-doc';
 
 // Several devices (each its own browser, as on separate phones and tablets) working on one
 // queue through the local Firebase emulator started by the Playwright config.
@@ -216,7 +217,7 @@ test('two order takers together cannot sell more pizzas than there are', async (
   for (const page of [first, other]) await expect(page.getByText('1 pizza left', { exact: true })).toBeVisible();
 });
 
-test("a customer's phone follows the order as the stations work on it", async ({ browser }) => {
+test("the order is saved for the customer's follow app as the stations work on it", async ({ browser }) => {
   const { first, id } = await startQueue(browser);
   await first.goto(`/${EMULATOR}#/q/${id}/take`);
   const kitchen = await join(browser, id, 'kitchen');
@@ -228,9 +229,8 @@ test("a customer's phone follows the order as the stations work on it", async ({
     return state.orders[0].id as string;
   }, id);
 
-  // The customer's phone isn't staff: it only gets the tracking link.
-  const phone = await device(browser, `/track/${orderId}`);
-  await expect(phone.locator('.track')).toContainText('Anna', { timeout: 20_000 });
+  // The customer's phone (the follow app) only reads this order's own encrypted document.
+  await expect.poll(() => savedTrack(orderId), { timeout: 20_000 }).toMatchObject({ customer: 'Anna', number: 1 });
   await markAll(kitchen, 1, 'Prepared');
   await markAll(oven, 1, 'Baked');
   await first.getByRole('navigation').getByRole('link', { name: 'Counter' }).click();
@@ -238,7 +238,7 @@ test("a customer's phone follows the order as the stations work on it", async ({
     .locator('app-order-card', { hasText: '#1' })
     .getByRole('button', { name: 'Ready for customer' })
     .click();
-  await expect(phone.locator('.track')).toHaveClass(/is-ready/, { timeout: 20_000 });
-  const copies = await phone.evaluate(() => Object.keys(localStorage).filter((k) => k.includes(':copy:')));
-  expect(copies).toEqual([]);
+  await expect
+    .poll(() => savedTrack(orderId), { timeout: 20_000 })
+    .toMatchObject({ status: 'ready-for-customer', stage: 'ready' });
 });

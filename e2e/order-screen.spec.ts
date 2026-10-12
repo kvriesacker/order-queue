@@ -96,10 +96,20 @@ test('the QR code shown while ordering is for the order that gets sent', async (
   }, queueId);
   expect(sent).toBe(drafted);
 
-  // The phone page for that id is the order's own page (it waits for the order to show up).
-  const phone = await context.newPage();
-  await phone.goto(`/?emulator=127.0.0.1#/track/${sent}`);
-  await expect(phone.locator('.track')).toBeVisible();
+  // The QR code opens that order in the customer's own follow app, never in this staff app.
+  await expect(screen.locator('.qr')).toHaveAttribute(
+    'data-link',
+    `https://kvriesacker.github.io/order-follow/?emulator=127.0.0.1#/${sent}`,
+  );
+});
+
+test('an order link from before the follow app opens that order in the follow app', async ({ page }) => {
+  await page.route('https://kvriesacker.github.io/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<p>Follow app</p>' }),
+  );
+  await page.goto('/?emulator=127.0.0.1#/track/abc123');
+  await expect(page).toHaveURL('https://kvriesacker.github.io/order-follow/?emulator=127.0.0.1#/abc123');
+  await expect(page.getByText('Follow app')).toBeVisible();
 });
 
 test('the customer screen lists the pizzas and warns when they are almost sold out', async ({ page, context }) => {

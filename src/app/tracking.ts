@@ -3,8 +3,9 @@ import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
 /**
- * What a customer sees when following their own order on their phone. It's stored
- * per order, encrypted with a key derived from the order id, so the tracking link
+ * What a customer sees when following their own order on their phone, in the follow app
+ * (repository order-follow, which has its own copy of this type: keep the two in step). It's
+ * stored per order, encrypted with a key derived from the order id, so the tracking link
  * never reveals the queue itself.
  */
 export interface OrderTrack {
@@ -39,19 +40,4 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
     lang: state.lang ?? 'nl',
   };
-}
-
-export type TrackAlert = 'baking' | 'ready';
-
-/**
- * What to tell a customer following their order: once when it goes into the oven and once when
- * it's ready to collect. Nothing for what was already true when they opened the page.
- */
-export function trackAlert(before: OrderTrack | null, after: OrderTrack): TrackAlert | null {
-  if (!before) return null;
-  if (after.status === 'ready-for-customer' && before.status !== 'ready-for-customer') return 'ready';
-  if (after.stage === 'baking' && before.stage !== 'baking' && before.status !== 'ready-for-customer') {
-    return 'baking';
-  }
-  return null;
 }

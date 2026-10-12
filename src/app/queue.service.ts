@@ -30,6 +30,7 @@ import {
 import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
 import { OrderTrack, trackCrypto } from './tracking';
+import { FOLLOW_OVERRIDE, followLink } from './follow-app';
 import { EMULATOR_HOST, firestore } from './firebase';
 import { settle, trackChanges } from './sync';
 import { DEFAULT_LANG, Lang, queueLang, t } from './i18n/i18n';
@@ -357,9 +358,9 @@ export class QueueService {
     return `${appBase()}#/q/${id}`;
   }
 
-  /** The link a customer scans to follow one order (it doesn't give access to the queue). */
+  /** The link a customer scans to follow one order, in the follow app (not this one). */
   trackLink(orderId: string): string {
-    return `${appBase()}#/track/${orderId}`;
+    return followLink(orderId);
   }
 
   private close(): void {
@@ -632,9 +633,12 @@ function docId(crypto: QueueCrypto): string {
   return crypto.topic.slice(crypto.topic.lastIndexOf('/') + 1);
 }
 
-/** This app's address, keeping an emulator override so links work in local tests too. */
+/** This app's address, keeping test overrides (emulator, follow app) so links work in local tests too. */
 function appBase(): string {
   const { origin, pathname } = window.location;
-  const search = EMULATOR_HOST ? `?emulator=${encodeURIComponent(EMULATOR_HOST)}` : '';
+  const params = new URLSearchParams();
+  if (EMULATOR_HOST) params.set('emulator', EMULATOR_HOST);
+  if (FOLLOW_OVERRIDE) params.set('follow', FOLLOW_OVERRIDE);
+  const search = params.size ? `?${params}` : '';
   return `${origin}${pathname}${search}`;
 }
