@@ -53,27 +53,39 @@ describe('applyAction', () => {
     expect(normalizeState({ ...s, ovensOut: undefined } as unknown as QueueState).ovensOut).toEqual([]);
   });
 
-  it('lets the counter hand over baked pizzas of a big order before the rest is done', () => {
+  it('lets the counter show and hand over baked pizzas of a big order before the rest is done', () => {
     let s = applyAction(empty, { ...add('a'), items: [{ name: 'Margherita', qty: 3, note: '', color: '#e53935' }] });
     const pizza = (unit: number, status: 'new' | 'prepared' | 'baked'): QueueAction =>
       ({ type: 'pizza', id: 'a', item: 0, unit, status });
+    const call = (unit: number, called = true): QueueAction => ({ type: 'call', id: 'a', item: 0, unit, called });
     const hand = (unit: number, handed = true): QueueAction => ({ type: 'hand', id: 'a', item: 0, unit, handed });
     s = applyAction(applyAction(s, pizza(0, 'prepared')), pizza(0, 'baked'));
-    // Only a baked pizza can be handed over.
-    expect(applyAction(s, hand(1))).toBe(s);
+    // Only a baked pizza goes on the customer screen, and only one there is handed over.
+    expect(applyAction(s, call(1))).toBe(s);
+    expect(applyAction(s, hand(0))).toBe(s);
+    s = applyAction(s, call(0), 4);
+    expect(s.orders[0].items[0].times[0].called).toBe(4);
+    expect(s.orders[0].status).toBe('in-progress');
+    // On the customer screen: the oven can't take it back.
+    expect(applyAction(s, pizza(0, 'prepared'))).toBe(s);
+    expect(applyAction(s, call(0, false)).orders[0].items[0].times[0].called).toBeUndefined();
     s = applyAction(s, hand(0), 5);
     expect(s.orders[0].items[0].times[0].handed).toBe(5);
-    expect(s.orders[0].status).toBe('in-progress');
-    // The customer has it: the oven can't take it back, and moving the order back keeps it.
-    expect(applyAction(s, pizza(0, 'prepared'))).toBe(s);
+    expect(applyAction(s, call(0, false))).toBe(s);
+    // Moving the order back keeps what the customer has.
     const back = applyAction(s, { type: 'status', id: 'a', status: 'new' });
     expect(back.orders[0].items[0].units).toEqual(['baked', 'new', 'new']);
     expect(back.orders[0].items[0].times[0].handed).toBe(5);
-    // Undo, then hand it over again.
     expect(applyAction(s, hand(0, false)).orders[0].items[0].times[0].handed).toBeUndefined();
-    // Once the customer has every pizza, the order is picked up.
+    // The rest is baked and shown: the whole order is on the customer screen.
     for (const u of [1, 2]) s = applyAction(applyAction(s, pizza(u, 'prepared')), pizza(u, 'baked'));
     expect(s.orders[0].status).toBe('ready');
+    s = applyAction(applyAction(s, call(1)), call(2));
+    expect(s.orders[0].status).toBe('ready-for-customer');
+    // Taking the order back off the screen takes its pizzas off too, except the given one.
+    const off = applyAction(s, { type: 'status', id: 'a', status: 'ready' });
+    expect(off.orders[0].items[0].times.map((t) => !!t.called)).toEqual([true, false, false]);
+    // Once the customer has every pizza, the order is picked up.
     s = applyAction(applyAction(s, hand(1)), hand(2));
     expect(s.orders[0].status).toBe('collected');
   });

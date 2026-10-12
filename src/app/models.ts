@@ -35,6 +35,8 @@ export interface OrderItem {
 export interface PizzaTimes {
   prepared?: number;
   baked?: number;
+  /** When the counter put this pizza on the customer screen, before the rest of a big order. */
+  called?: number;
   /** When the counter gave this pizza to the customer, before the rest of a big order. */
   handed?: number;
 }
@@ -229,7 +231,9 @@ export type QueueAction =
   | { type: 'timing'; timing: Timing }
   /** The default language for devices that join and for customer screens. */
   | { type: 'lang'; lang: 'nl' | 'en' }
-  /** The counter gives one baked pizza to the customer (or takes that back). */
+  /** The counter shows one baked pizza on the customer screen (or takes that back). */
+  | { type: 'call'; id: string; item: number; unit: number; called: boolean }
+  /** The counter gives one pizza from the customer screen to the customer (or takes that back). */
   | { type: 'hand'; id: string; item: number; unit: number; handed: boolean }
   /** The oven station marks one oven out of order, or working again. */
   | { type: 'oven'; index: number; out: boolean }
@@ -309,12 +313,18 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         // Moving a whole order back into the kitchen (undo at the counter) or forward
         // past it keeps its pizzas consistent with the order.
         // Pizzas already given to the customer stay as they are.
+        // Moving it back off the customer screen takes its pizzas off too.
         const unit = UNIT_FOR_ORDER_STATUS[action.status];
         if (unit) {
           items = o.items.map((i) => ({
             ...i,
             units: i.units.map((u, j) => (i.times[j]?.handed ? u : unit)),
-            times: unit === 'new' ? i.times.map((t) => (t.handed ? t : {})) : i.times,
+            times: i.times.map((t) => {
+              if (t.handed) return t;
+              if (unit === 'new') return {};
+              const { called: _, ...rest } = t;
+              return rest;
+            }),
           }));
         }
         const bakedAt = action.status === 'ready' ? (o.bakedAt ?? now) : o.bakedAt;
@@ -327,8 +337,9 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       const current = target?.items[action.item]?.units[action.unit];
       if (!target || !current || current === action.status) return state;
       if (!['new', 'in-progress', 'ready'].includes(target.status)) return state;
-      // A pizza the customer already has can't go back to the kitchen or oven.
-      if (target.items[action.item].times[action.unit]?.handed) return state;
+      // A pizza on the customer screen or already given can't go back to the kitchen or oven.
+      const was = target.items[action.item].times[action.unit];
+      if (was?.handed || was?.called) return state;
       if (!PIZZA_STATUSES.includes(action.status)) return state;
       return updateOrder(state, action.id, (o) => {
         const items = o.items.map((item, i) =>
@@ -347,11 +358,40 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         return { ...o, items, status, bakedAt, updatedAt: now };
       });
     }
+    case 'call': {
+      const target = state.orders.find((o) => o.id === action.id);
+      const unit = target?.items[action.item]?.units[action.unit];
+      if (!target || unit !== 'baked') return state;
+      if (!['in-progress', 'ready'].includes(target.status)) return state;
+      const times = target.items[action.item].times[action.unit] ?? {};
+      if (times.handed || !!times.called === action.called) return state;
+      return updateOrder(state, action.id, (o) => {
+        const items: OrderItem[] = o.items.map((item, i) =>
+          i !== action.item
+            ? item
+            : {
+                ...item,
+                times: item.times.map((t, j): PizzaTimes => {
+                  if (j !== action.unit) return t;
+                  const { called: _, ...rest } = t;
+                  return action.called ? { ...rest, called: now } : rest;
+                }),
+              },
+        );
+        // Once every pizza is on the customer screen (or given), so is the order.
+        const all = items.every((i) => i.units.every((_, j) => i.times[j]?.called || i.times[j]?.handed));
+        return all
+          ? { ...o, items, status: 'ready-for-customer', bakedAt: o.bakedAt ?? now, calledAt: now, updatedAt: now }
+          : { ...o, items, updatedAt: now };
+      });
+    }
     case 'hand': {
       const target = state.orders.find((o) => o.id === action.id);
       const unit = target?.items[action.item]?.units[action.unit];
       if (!target || unit !== 'baked') return state;
       if (!['in-progress', 'ready', 'ready-for-customer'].includes(target.status)) return state;
+      // Only pizzas on the customer screen are handed over.
+      if (!pizzaCalled(target, action.item, action.unit)) return state;
       const times = target.items[action.item].times[action.unit] ?? {};
       if (!!times.handed === action.handed) return state;
       return updateOrder(state, action.id, (o) => {
@@ -442,6 +482,12 @@ export type DisplayStage = 'ordered' | 'preparing' | 'baking' | 'ready';
  * kitchen has prepared one pizza, "Baking" once all are prepared (in the oven) or one is baked,
  * and "Ready" once the counter calls it. Finished and cancelled orders show nowhere.
  */
+/** Whether one pizza is on the customer screen: called on its own, with its order, or given. */
+export function pizzaCalled(order: Order, item: number, unit: number): boolean {
+  const times = order.items[item]?.times[unit];
+  return order.status === 'ready-for-customer' || !!times?.called || !!times?.handed;
+}
+
 export function displayStage(order: Order): DisplayStage | null {
   if (order.status === 'ready-for-customer') return 'ready';
   if (order.status === 'collected' || order.status === 'cancelled') return null;

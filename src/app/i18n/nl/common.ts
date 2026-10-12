@@ -56,4 +56,13 @@ export const NL_COMMON: Record<string, string> = {
   'Exit full screen': 'Volledig scherm sluiten',
   '+{n} pizza still in the kitchen': '+{n} pizza nog in de keuken',
   '+{n} pizzas still in the kitchen': "+{n} pizza's nog in de keuken",
+  // Counter: showing single pizzas on the customer screen
+  'On the customer screen': 'Op het klantenscherm',
+  'To customer screen': 'Naar klantenscherm',
+  'Show {pizza} on the customer screen': '{pizza} op het klantenscherm zetten',
+  'Take {pizza} off the customer screen': '{pizza} van het klantenscherm halen',
+  // Customer display: a big order partly ready
+  'Part of the order, the rest follows': 'Deel van de bestelling, de rest volgt',
+  'The rest was already handed over': 'De rest is al meegegeven',
+  'Rest of the order': 'Rest van de bestelling',
 };

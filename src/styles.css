@@ -1926,17 +1926,26 @@ app-install {
   gap: 0.4rem;
 }
 .board.counter-board {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr);
 }
+/* On smaller screens the orders still being made go below the ones to hand out. */
 @media (max-width: 960px) {
   .board.counter-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .counter-board .making-col {
+    order: 3;
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 640px) {
   .board.counter-board {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.counter-pizzas li.called .chip {
+  outline: 2px solid #2e7d32;
+  outline-offset: 1px;
 }
 
 /* Kitchen and oven: full screen shows only what to tick off */
@@ -1959,4 +1968,14 @@ app-install {
   .kitchen.focus {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+/* Customer display: part of a big order */
+.prep-part {
+  display: block;
+  font-size: clamp(0.75rem, 4cqi, 1rem);
+  font-weight: 700;
+  color: #f2b84b;
+}
+.ready-list .prep-part {
+  color: #fff3c4;
 }

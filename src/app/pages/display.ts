@@ -2,8 +2,8 @@ import { Component, computed, effect, inject, input, signal, untracked } from '@
 import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
-import { DisplayStage, Order, displayStage } from '../models';
-import { T, speakToCustomers } from '../i18n/i18n';
+import { DisplayStage, Order, PizzaStatus, displayStage, pizzaCalled } from '../models';
+import { T, speakToCustomers, t } from '../i18n/i18n';
 
 const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
   { stage: 'ordered', title: 'Ordered', empty: 'No new orders.' },
@@ -31,6 +31,9 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
                 <span class="prep-who">
                   <strong>{{ p.name || ('Order {n}' | t: { n: p.number }) }}</strong>
                   <span class="prep-pizzas">{{ p.pizzas }}</span>
+                  @if (p.part) {
+                    <span class="prep-part">{{ p.part }}</span>
+                  }
                 </span>
                 @if (col.stage !== 'ready' && p.eta) {
                   <span class="prep-eta"
@@ -75,32 +78,85 @@ export class Display {
   protected summary = pizzaSummary;
   protected until = (t: number) => minutesUntil(t, this.queue.now());
 
-  protected readyOrders = computed(() =>
+  /**
+   * Each open order split in what's ready (on the customer screen), what the customer already
+   * has, and the rest, so a big order can be partly ready.
+   */
+  private parts = computed(() =>
     this.queue
       .orders()
-      .filter((o) => o.status === 'ready-for-customer')
-      .sort((a, b) => b.updatedAt - a.updatedAt),
+      .filter((o) => o.status !== 'collected' && o.status !== 'cancelled')
+      .map((o) => {
+        const ready: string[] = [];
+        const rest: string[] = [];
+        const restUnits: PizzaStatus[] = [];
+        let handed = 0;
+        o.items.forEach((item, i) =>
+          item.units.forEach((unit, u) => {
+            if (item.times[u]?.handed) handed++;
+            else if (pizzaCalled(o, i, u)) ready.push(item.name);
+            else {
+              rest.push(item.name);
+              restUnits.push(unit);
+            }
+          }),
+        );
+        // A partly ready order shows its rest where those pizzas are.
+        const stage =
+          ready.length || handed
+            ? displayStage({ ...o, items: [{ ...o.items[0], units: restUnits }] })
+            : displayStage(o);
+        return { order: o, ready, rest, handed, stage };
+      }),
   );
-  protected ready = computed(() => this.readyOrders().map((o) => o.number));
-  protected freshest = computed(() => this.ready()[0]);
+  protected readyOrders = computed(() =>
+    this.parts()
+      .filter((p) => p.ready.length)
+      .sort((a, b) => b.order.updatedAt - a.order.updatedAt),
+  );
+  /** What's on the Ready block, to chime when something new is ready. */
+  protected ready = computed(() => this.readyOrders().map((p) => `${p.order.number}:${p.ready.length}`));
+  protected freshest = computed(() => this.readyOrders()[0]?.order.number);
   protected columns = computed(() => {
     const estimates = this.queue.estimates();
-    const row = (o: Order) => ({
+    return COLUMNS.map((c) => {
+      const rows =
+        c.stage === 'ready'
+          ? this.readyOrders().map((p) => ({
+              ...this.row(p.order, p.ready),
+              // Part of a big order: say so, and what's still coming or already given.
+              part: p.rest.length
+                ? t('Part of the order, the rest follows')
+                : p.handed
+                  ? t('The rest was already handed over')
+                  : '',
+            }))
+          : this.parts()
+              .filter((p) => p.rest.length && p.order.status !== 'ready-for-customer')
+              .filter((p) => p.stage === c.stage)
+              .map((p) => ({
+                ...this.row(p.order, p.rest),
+                eta: estimates.get(p.order.id),
+                part: p.ready.length || p.handed ? t('Rest of the order') : '',
+              }));
+      return { ...c, orders: rows };
+    });
+  });
+
+  private row(o: Order, names: string[]) {
+    const counts = new Map<string, number>();
+    for (const n of names) counts.set(n, (counts.get(n) ?? 0) + 1);
+    return {
       id: o.id,
       number: o.number,
       name: o.customer,
-      pizzas: pizzaSummary(o),
-      eta: estimates.get(o.id),
-    });
-    const inStage = (stage: DisplayStage) =>
-      this.queue.orders().filter((o) => displayStage(o) === stage);
-    return COLUMNS.map((c) => ({
-      ...c,
-      orders: (c.stage === 'ready' ? this.readyOrders() : inStage(c.stage)).map(row),
-    }));
-  });
+      pizzas: [...counts].map(([name, n]) => `${n}× ${name}`).join(', '),
+      eta: undefined as number | undefined,
+      part: '',
+    };
+  }
 
-  private seen = new Set<number>();
+  private seen = new Set<string>();
   private primed = false;
 
   constructor() {
