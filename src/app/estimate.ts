@@ -1,4 +1,4 @@
-import { Order, QueueState, Timing } from './models';
+import { NewOrderItem, Order, QueueState, Timing, applyAction } from './models';
 
 const MINUTE = 60000;
 /** Only the last hour counts when measuring how fast things go. */
@@ -127,6 +127,18 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
   const result = new Map<string, number>();
   for (const [id, baked] of lastBaked) result.set(id, Math.max(now, baked + counter));
   return result;
+}
+
+/**
+ * When an order still being taken would be ready if it were sent now, or undefined when it
+ * couldn't be (too few pizzas left, or no oven working).
+ */
+export function estimateIfSent(state: QueueState, items: NewOrderItem[], now: number): number | undefined {
+  const id = '(not sent yet)';
+  // After every order already sent, even if the clock here ticked a little while ago.
+  const at = Math.max(now, ...state.orders.map((o) => o.createdAt + 1));
+  const after = applyAction(state, { type: 'add', id, customer: '', items, note: '' }, at);
+  return after === state ? undefined : estimateReady(after, now).get(id);
 }
 
 /** "2× Margherita, 1× Funghi" for an order, without per-pizza notes. */

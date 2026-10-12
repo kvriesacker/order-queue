@@ -68,3 +68,22 @@ test('kitchen and oven show the pizzas of an order by type, and the oven one ord
     expect(boxes[i]!.y).toBeGreaterThanOrEqual(boxes[i - 1]!.y + boxes[i - 1]!.height);
   }
 });
+
+test('the order taker sees when an order will be ready before sending it', async ({ page }) => {
+  await start(page);
+  const eta = page.locator('.draft-eta');
+  await expect(eta).toHaveCount(0);
+  await page.locator('.menu-item', { hasText: 'Margherita' }).click();
+  await expect(eta).toContainText(/Ready around \d{1,2}:\d{2}.*if sent now/);
+
+  // Under the total, above the customer name.
+  const etaBox = (await eta.boundingBox())!;
+  expect(etaBox.y).toBeGreaterThan((await page.locator('.totals').boundingBox())!.y);
+  expect(etaBox.y).toBeLessThan((await page.locator('input[name=customer]').boundingBox())!.y);
+
+  // Once sent, the order gets the same time.
+  const before = await eta.locator('strong').innerText();
+  await page.getByRole('button', { name: 'Send to kitchen' }).click();
+  await expect(page.locator('.sent')).toContainText(`Estimated ready at ${before}`);
+  await expect(eta).toHaveCount(0);
+});

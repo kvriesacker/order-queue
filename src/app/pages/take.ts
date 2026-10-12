@@ -4,7 +4,7 @@ import { NewOrderItem, OTHER_COLOR, formatPrice, orderTotal, priceOf, randomId }
 
 const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
-import { clockTime, minutesUntil } from '../estimate';
+import { clockTime, estimateIfSent, minutesUntil } from '../estimate';
 import { OrderCard } from './order-card';
 
 @Component({
@@ -152,6 +152,13 @@ import { OrderCard } from './order-card';
               </tr>
             </tfoot>
           </table>
+        }
+        @if (cart().length) {
+          @if (draftEta(); as t) {
+            <p class="draft-eta">
+              Ready around <strong>{{ clock(t) }}</strong> ({{ until(t) }}) if sent now
+            </p>
+          }
         }
 
         <div class="grid2">
@@ -356,6 +363,12 @@ export class Take {
   /** The order just sent was refused because another order took the last pizzas. */
   protected refused = computed(() => this.queue.refused().has(this.lastId()));
   protected lastEta = computed(() => this.queue.estimates().get(this.lastId()));
+  /** When the order being taken would be ready if sent now, for the customer at the counter. */
+  protected draftEta = computed(() => {
+    const state = this.queue.state();
+    const cart = this.cart();
+    return state && cart.length ? estimateIfSent(state, cart, this.queue.now()) : undefined;
+  });
   protected clock = clockTime;
   /** The screen facing the customer while ordering, best opened on a second display. */
   protected screenLink = computed(

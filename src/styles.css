@@ -1773,3 +1773,17 @@ app-install {
 .queue-row > .btn.ghost {
   flex-shrink: 0;
 }
+
+/* Orders tab: when the order being taken would be ready, before it's sent. */
+.draft-eta {
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  background: #fff3de;
+  color: #8a5a00;
+  font-weight: 600;
+}
+.draft-eta strong {
+  font-size: 1.1rem;
+  color: var(--ink, #2b1d16);
+}

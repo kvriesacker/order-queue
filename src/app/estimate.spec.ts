@@ -1,4 +1,4 @@
-import { estimateReady, phaseTimes, pizzaSummary } from './estimate';
+import { estimateIfSent, estimateReady, phaseTimes, pizzaSummary } from './estimate';
 import { NewOrderItem, PizzaStatus, QueueState, applyAction } from './models';
 
 const MIN = 60000;
@@ -126,5 +126,23 @@ describe('estimateReady', () => {
       ],
     });
     expect(pizzaSummary(s.orders[0])).toBe('2× Margherita, 1× Funghi');
+  });
+});
+
+describe('estimateIfSent', () => {
+  const items: NewOrderItem[] = [{ name: 'Margherita', qty: 1, note: '', color: '#e53935' }];
+
+  it('gives the time an order would be ready if sent now, the same as once sent', () => {
+    const s = order(queue(), 'a', 2, T0);
+    const draft = estimateIfSent(s, items, T0);
+    expect(draft).toBe(estimateReady(order(s, 'b', 1, T0 + 1), T0).get('b'));
+    // Behind the orders already waiting: 3 pizzas × 3 min, then 8 min baking and 2 at the counter.
+    expect(draft).toBe(T0 + 19 * MIN);
+  });
+
+  it('gives no time when the order could not be sent', () => {
+    const s = queue();
+    const full = { ...s, timing: { ...s.timing, maxPizzas: 1 } };
+    expect(estimateIfSent(order(full, 'a', 1, T0), items, T0)).toBeUndefined();
   });
 });
