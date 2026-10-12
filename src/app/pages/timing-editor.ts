@@ -6,9 +6,9 @@ import { T } from '../i18n/i18n';
 type Field = { key: keyof Timing; label: string; hint: string };
 
 const FIELDS: Field[] = [
-  { key: 'prepareMinutes', label: 'Prepare', hint: 'minutes per pizza in the kitchen' },
-  { key: 'bakeMinutes', label: 'Bake', hint: 'minutes in the oven' },
-  { key: 'counterMinutes', label: 'Counter', hint: 'minutes to call the order once baked' },
+  { key: 'prepareMinutes', label: 'Prepare', hint: 'seconds per pizza in the kitchen' },
+  { key: 'bakeMinutes', label: 'Bake', hint: 'seconds in the oven' },
+  { key: 'counterMinutes', label: 'Counter', hint: 'seconds to call the order once baked' },
 ];
 
 const OVEN_FIELDS: Field[] = [
@@ -58,14 +58,15 @@ const OVEN_FIELDS: Field[] = [
           <span
             >{{ f.label | t }} <span class="muted">({{ f.hint | t }})</span></span
           >
+          <!-- Set in seconds, to start closer to the real pace; kept in minutes. -->
           <input
             type="number"
-            min="0.5"
-            max="180"
-            step="0.5"
-            inputmode="decimal"
-            [value]="timing()[f.key]"
-            (input)="set(f.key, $any($event.target).valueAsNumber)"
+            min="5"
+            max="10800"
+            step="5"
+            inputmode="numeric"
+            [value]="seconds(timing()[f.key])"
+            (input)="setSeconds(f.key, $any($event.target).valueAsNumber)"
           />
         </label>
       }
@@ -107,6 +108,14 @@ export class TimingEditor {
 
   setPrice(value: number) {
     if (value >= 0 && value <= 1000) this.timing.update((t) => ({ ...t, price: Math.round(value * 100) / 100 }));
+  }
+
+  protected seconds(minutes: number): number {
+    return Math.round(minutes * 60);
+  }
+
+  setSeconds(key: keyof Timing, seconds: number) {
+    if (seconds > 0 && seconds <= 10800) this.timing.update((t) => ({ ...t, [key]: Math.round(seconds) / 60 }));
   }
 
   set(key: keyof Timing, value: number, whole = false) {

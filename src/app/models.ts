@@ -461,7 +461,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       };
     case 'timing': {
       const minutes = (n: unknown, fallback: number) =>
-        typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
+        // Kept to the second: the host sets these in seconds.
+        typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 60) / 60 : fallback;
       const count = (n: unknown, fallback: number) =>
         typeof n === 'number' && n >= 1 && n <= OVEN_MAX ? Math.floor(n) : fallback;
       const timing = { ...state.timing };

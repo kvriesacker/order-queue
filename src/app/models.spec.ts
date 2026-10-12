@@ -145,6 +145,18 @@ describe('applyAction', () => {
     expect(applyAction(s, { type: 'lang', lang: 'fr' as 'en' })).toBe(s);
   });
 
+  it('keeps phase times to the second, as the host sets them in seconds', () => {
+    const s = applyAction(empty, {
+      type: 'timing',
+      timing: { ...empty.timing, prepareMinutes: 75 / 60, bakeMinutes: 455 / 60, counterMinutes: 0.123 },
+    });
+    expect(Math.round(s.timing.prepareMinutes * 60)).toBe(75);
+    expect(s.timing.prepareMinutes).toBeCloseTo(1.25);
+    expect(s.timing.bakeMinutes * 60).toBeCloseTo(455);
+    // Anything finer is rounded to the second.
+    expect(s.timing.counterMinutes * 60).toBeCloseTo(7);
+  });
+
   it('keeps the sponsors for the customer screens, trimmed, with a sensible interval', () => {
     expect(normalizeState(empty)).toMatchObject({ sponsors: [], sponsorSeconds: 10 });
     const s = applyAction(empty, {
