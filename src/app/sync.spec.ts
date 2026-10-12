@@ -68,6 +68,20 @@ describe('trackChanges', () => {
     expect(changes.has('a')).toBe(false);
   });
 
+  it("gives every followed order the shop's sponsors when they change, within the room there is", () => {
+    const before = applyAction(applyAction(empty, add('a'), now), add('b'), now);
+    const many = Array.from({ length: 30 }, (_, i) => ({ name: `Sponsor ${i}`, message: 'x'.repeat(100) }));
+    const after = applyAction(before, { type: 'sponsors', sponsors: many, seconds: 8 }, now);
+    const changes = trackChanges(before, after, now);
+    expect([...changes.keys()].sort()).toEqual(['a', 'b']);
+    const track = changes.get('a')!;
+    expect(track.sponsorSeconds).toBe(8);
+    expect(track.sponsors![0]).toEqual(many[0]);
+    expect(JSON.stringify(track.sponsors).length).toBeLessThanOrEqual(1000);
+    // Without sponsors the order's page carries none.
+    expect(trackChanges(empty, before, now).get('a')!.sponsors).toBeUndefined();
+  });
+
   it('stops tracking orders the queue no longer has', () => {
     const before = applyAction(empty, add('a'), now);
     const changes = trackChanges(before, { ...before, orders: [] }, now);

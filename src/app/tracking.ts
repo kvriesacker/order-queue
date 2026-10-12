@@ -1,4 +1,7 @@
-import { DisplayStage, Order, OrderStatus, QueueState, displayStage, pizzaStage, stageCounts } from './models';
+import {
+  DEFAULT_SPONSOR_SECONDS, DisplayStage, Order, OrderStatus, QueueState, Sponsor, displayStage, pizzaStage,
+  stageCounts,
+} from './models';
 import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
@@ -27,6 +30,25 @@ export interface OrderTrack {
   eta?: number;
   /** The queue's language, which the follow page speaks (older versions don't send it). */
   lang?: 'nl' | 'en';
+  /** The shop's sponsors, shown in turn like on its customer screens; absent without any. */
+  sponsors?: Sponsor[];
+  /** Seconds each sponsor stays before the next one. */
+  sponsorSeconds?: number;
+}
+
+/** Room for sponsors in one order's document, which has a size limit (see firestore.rules). */
+const SPONSOR_ROOM = 1000;
+
+/** The sponsors that fit in a follow page's document, in order. */
+function trackSponsors(sponsors: Sponsor[] | undefined): Sponsor[] {
+  const fit: Sponsor[] = [];
+  let size = 0;
+  for (const s of sponsors ?? []) {
+    size += JSON.stringify(s).length + 1;
+    if (size > SPONSOR_ROOM) break;
+    fit.push(s);
+  }
+  return fit;
 }
 
 export interface TrackPizza {
@@ -60,5 +82,11 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     ),
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
     lang: state.lang ?? 'nl',
+    ...sponsorFields(state),
   };
+}
+
+function sponsorFields(state: QueueState): Pick<OrderTrack, 'sponsors' | 'sponsorSeconds'> {
+  const sponsors = trackSponsors(state.sponsors);
+  return sponsors.length ? { sponsors, sponsorSeconds: state.sponsorSeconds ?? DEFAULT_SPONSOR_SECONDS } : {};
 }
