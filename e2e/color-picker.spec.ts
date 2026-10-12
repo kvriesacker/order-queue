@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 /** The picker must be big enough to tap, and nothing may cover it. */
 async function expectUsable(picker: Locator) {
@@ -76,7 +76,7 @@ test('a color changed in Settings is saved and used for new orders', async ({ pa
   await page.getByRole('button', { name: 'Save settings' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
 
-  // Still there after a reload: the host saved it with the queue.
+  // Still there after a reload: it was saved with the queue.
   await page.reload();
   await expect(page.getByLabel('Color for Funghi')).toHaveValue('#0000ff');
 

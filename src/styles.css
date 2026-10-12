@@ -812,6 +812,8 @@ input.swatch {
 /* Customer screen: four blocks, from ordered to ready */
 .display {
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+  /* The pop of a just-called order mustn't make the page scroll sideways. */
+  overflow-x: clip;
 }
 .display-col {
   padding: 1.5rem 1.2rem;

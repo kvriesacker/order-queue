@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 function tab(page: Page, name: string) {
   return page.getByRole('navigation').getByRole('link', { name, exact: true });
@@ -47,7 +47,9 @@ test('prices: a general price, a price per pizza, and totals for order taker and
   await expect(page.locator('.sent')).toContainText('To pay: €31.00');
   await expect(screen.locator('.os-order')).toContainText('Total €31.00');
 
-  // A new general price counts for new orders only.
+  // A new general price counts for new orders only. (Back to the order taker's window: one
+  // in the background barely updates.)
+  await page.bringToFront();
   await tab(page, 'Settings').click();
   await page.getByLabel('Price per pizza').fill('10');
   await page.getByRole('button', { name: 'Save settings' }).click();

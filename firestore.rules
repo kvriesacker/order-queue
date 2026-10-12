@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Pizza queue. Every document holds only ciphertext ("data"), encrypted in the browser with
+// a key from the queue link, under a hashed id that can't be guessed. Only the app (signed
+// in anonymously) gets in, it can only open a document whose id it knows, and nobody can
+// list the queues.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function hashId(id) {
+      return id.matches('^[0-9a-f]{32}$');
+    }
+    function sealed(maxSize) {
+      return request.resource.data.keys().hasOnly(['data', 'by', 'at'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < maxSize;
+    }
+
+    // One queue: the whole queue, encrypted.
+    match /queues/{queue} {
+      allow get: if signedIn() && hashId(queue);
+      allow create, update: if signedIn() && hashId(queue) && sealed(1000000);
+
+      // What each order point is typing, for the customer's order screen.
+      match /drafts/{pos} {
+        allow read: if signedIn() && hashId(queue);
+        allow write: if signedIn() && hashId(queue) && pos.size() <= 40 && sealed(20000);
+      }
+    }
+
+    // One order, for the customer following it on their phone.
+    match /tracks/{order} {
+      allow get: if signedIn() && hashId(order);
+      allow create, update: if signedIn() && hashId(order) && sealed(5000);
+      allow delete: if signedIn() && hashId(order);
+    }
+  }
+}

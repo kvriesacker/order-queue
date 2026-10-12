@@ -1,9 +1,8 @@
 import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
-import mqtt, { type MqttClient } from 'mqtt';
-import { brokerUrl } from '../queue.service';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { firestore } from '../firebase';
 import { OrderTrack, TrackAlert, trackAlert, trackCrypto } from '../tracking';
 import { clockTime, minutesUntil } from '../estimate';
-import { randomId } from '../models';
 
 const STEPS = [
   { label: 'Ordered', done: ['new', 'in-progress', 'ready', 'ready-for-customer', 'collected'] },
@@ -111,7 +110,8 @@ export class Track {
   private now = signal(Date.now());
   protected until = (t: number) => minutesUntil(t, this.now());
 
-  private client: MqttClient | null = null;
+  private stop: (() => void) | null = null;
+  private following = '';
   /** The last thing that happened worth telling, shown on the page too. */
   protected alert = signal<TrackAlert | null>(null);
   protected permission = signal<NotificationPermission | 'unsupported'>(
@@ -125,7 +125,7 @@ export class Track {
     inject(DestroyRef).onDestroy(() => {
       clearInterval(timer);
       clearTimeout(slow);
-      this.client?.end(true);
+      this.stop?.();
     });
     effect(() => this.follow(this.order$()));
     // Buzz the phone once when the order is ready to collect, even if it was opened just then.
@@ -186,34 +186,31 @@ export class Track {
   }
 
   private async follow(orderId: string) {
-    this.client?.end(true);
+    this.stop?.();
+    this.stop = null;
+    this.following = orderId;
     const crypto = await trackCrypto(orderId);
-    const topic = `${crypto.topic}/order`;
-    const client = mqtt.connect(brokerUrl(), {
-      clientId: `pq-${randomId(12)}`,
-      clean: true,
-      keepalive: 30,
-      connectTimeout: 10000,
-      reconnectPeriod: 2000,
-    });
-    this.client = client;
+    const db = await firestore().catch(() => null);
+    if (!db || orderId !== this.following) return;
+    const id = crypto.topic.slice(crypto.topic.lastIndexOf('/') + 1);
     let inbox = Promise.resolve();
-    client.on('connect', () => {
-      this.online.set(true);
-      client.subscribe(topic, { qos: 1 });
-    });
-    client.on('offline', () => this.online.set(false));
-    client.on('error', () => this.online.set(false));
-    client.on('message', (_topic, payload) => {
-      const text = payload.toString();
-      inbox = inbox.then(async () => {
-        if (!text) return;
-        const track = await crypto.decrypt<OrderTrack>(text);
-        if (!track || client !== this.client) return;
-        const alert = trackAlert(this.order(), track);
-        this.order.set(track);
-        if (alert) this.tell(alert, track);
-      });
-    });
+    this.stop = onSnapshot(
+      doc(db, 'tracks', id),
+      { includeMetadataChanges: true },
+      (snap) => {
+        this.online.set(!snap.metadata.fromCache);
+        const data = snap.get('data');
+        if (typeof data !== 'string') return;
+        inbox = inbox.then(async () => {
+          const track = await crypto.decrypt<OrderTrack>(data);
+          if (!track || orderId !== this.following) return;
+          if (JSON.stringify(track) === JSON.stringify(this.order())) return;
+          const alert = trackAlert(this.order(), track);
+          this.order.set(track);
+          if (alert) this.tell(alert, track);
+        });
+      },
+      () => this.online.set(false),
+    );
   }
 }

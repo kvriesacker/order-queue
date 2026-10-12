@@ -16,9 +16,7 @@ import { QueueService } from '../queue.service';
         <a routerLink="oven" routerLinkActive="active">Oven</a>
         <a routerLink="counter" routerLinkActive="active">Counter</a>
         <a routerLink="stats" routerLinkActive="active">Stats</a>
-        @if (queue.isHost()) {
-          <a routerLink="menu" routerLinkActive="active">Settings</a>
-        }
+        <a routerLink="menu" routerLinkActive="active">Settings</a>
       </nav>
       <div class="topbar-end">
         @if (queue.pizzasLeft(); as left) {
@@ -34,25 +32,10 @@ import { QueueService } from '../queue.service';
     </header>
     @if (queue.connection() === 'offline') {
       <p class="banner">No internet connection. Changes are sent when it’s back.</p>
-    } @else if (
-      queue.connection() === 'online' && !queue.isHost() && queue.hostOnline() === false
-    ) {
-      <div class="banner takeover">
-        @if (queue.takingOver()) {
-          <span>Taking over as host…</span>
-        } @else {
-          <span
-            >The queue’s host is offline. New orders and changes wait until its tab is open again,
-            or until this device takes over.</span
-          >
-          @if (queue.state()) {
-            <button class="btn primary small" type="button" (click)="takeOver()">Become host</button>
-          }
-        }
-      </div>
-    }
-    @if (queue.isHost()) {
-      <p class="banner subtle">This tab holds the queue. Keep it open so others stay in sync.</p>
+    } @else if (queue.connection() === 'no-backend') {
+      <p class="banner">
+        This app isn’t connected to its Firebase project yet, so changes stay on this device.
+      </p>
     }
     <router-outlet />
   `,
@@ -62,25 +45,13 @@ export class Shell {
   readonly id = input.required<string>();
   protected copied = signal(false);
 
-  async takeOver() {
-    const ok = confirm(
-      'Only do this if the host’s device is really gone. This device then holds the queue: keep this tab open.',
-    );
-    if (ok && !(await this.queue.takeOver())) {
-      alert('The host came back or another device took over first. Nothing changed here.');
-    }
-  }
-
   protected pill = computed(() => {
     const q = this.queue;
     if (q.connection() === 'offline') return { kind: 'offline', text: 'Offline' };
+    if (q.connection() === 'no-backend') return { kind: 'offline', text: 'Not connected' };
     if (q.connection() !== 'online') return { kind: 'connecting', text: 'Connecting…' };
-    if (q.isHost()) {
-      const n = q.guestCount();
-      return { kind: 'online', text: `Hosting · ${n} ${n === 1 ? 'device' : 'devices'}` };
-    }
-    return q.hostOnline() === false
-      ? { kind: 'offline', text: 'Host offline' }
+    return q.unsent()
+      ? { kind: 'connecting', text: 'Saving…' }
       : { kind: 'online', text: 'Connected' };
   });
 

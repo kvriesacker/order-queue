@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 test('past queues can be removed from the start page', async ({ page }) => {
   for (const name of ['Friday market', 'Saturday party']) {

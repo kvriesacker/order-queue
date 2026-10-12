@@ -3,8 +3,8 @@ import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
 /**
- * What a customer sees when following their own order on their phone. The host publishes
- * it per order, encrypted with a key derived from the order id, so the tracking link
+ * What a customer sees when following their own order on their phone. It's stored
+ * per order, encrypted with a key derived from the order id, so the tracking link
  * never reveals the queue itself.
  */
 export interface OrderTrack {
@@ -13,7 +13,7 @@ export interface OrderTrack {
   customer: string;
   pizzas: string;
   status: OrderStatus;
-  /** Which block of the customer display the order is in (older hosts don't send it). */
+  /** Which block of the customer display the order is in (older versions don't send it). */
   stage?: DisplayStage | null;
   /** Estimated ready time, cut to the minute, as clocks show it; absent once the order is ready. */
   eta?: number;

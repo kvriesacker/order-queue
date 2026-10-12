@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 function tab(page: Page, name: string) {
   return page.getByRole('navigation').getByRole('link', { name, exact: true });
@@ -30,7 +30,7 @@ async function station(page: Page, name: string, button: string, number: number,
   }
 }
 
-/** Kitchen, oven and counter finish one order (this tab is the host, so it can do all). */
+/** Kitchen, oven and counter finish one order (one device can do all). */
 async function finish(page: Page, number: number) {
   await station(page, 'Kitchen', 'Prepared', number);
   await station(page, 'Oven', 'Baked', number);

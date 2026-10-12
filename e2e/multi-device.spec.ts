@@ -1,10 +1,9 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 // Several devices (each its own browser, as on separate phones and tablets) working on one
-// queue through the local test broker started by the Playwright config.
-const BROKER = '?broker=ws://127.0.0.1:8884';
-// Takeovers wait for the host's absence to be noticed and for competing claims.
-test.setTimeout(150_000);
+// queue through the local Firebase emulator started by the Playwright config.
+const EMULATOR = '?emulator=127.0.0.1';
+test.setTimeout(120_000);
 // Syncing doesn't depend on screen size, so these run once (desktop) to keep the deploy quick.
 test.beforeEach(({}, info) => test.skip(info.project.name === 'phone', 'Runs on desktop only'));
 
@@ -12,24 +11,24 @@ async function device(browser: Browser, path = '') {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.on('dialog', (d) => d.accept());
-  if (path) await page.goto(`/${BROKER}#${path}`);
+  if (path) await page.goto(`/${EMULATOR}#${path}`);
   return page;
 }
 
-async function startQueue(browser: Browser) {
-  const host = await device(browser, '/');
-  await host.getByRole('button', { name: 'Start queue' }).click();
-  await expect(host).toHaveURL(/#\/q\/\w+$/);
-  await expect(host.getByText(/Hosting/)).toBeVisible();
-  const id = host.url().split('/q/')[1];
-  return { host, id };
+async function startQueue(browser: Browser, maxPizzas = 0) {
+  const first = await device(browser, '/');
+  if (maxPizzas) await first.getByLabel(/Pizzas available in total/).fill(String(maxPizzas));
+  await first.getByRole('button', { name: 'Start queue' }).click();
+  await expect(first).toHaveURL(/#\/q\/\w+$/);
+  await expect(first.getByText('Connected', { exact: true })).toBeVisible({ timeout: 20_000 });
+  const id = first.url().split('/q/')[1];
+  return { first, id };
 }
 
 /** Opens a station on a new device and waits until it has the queue. */
 async function join(browser: Browser, id: string, station: string) {
   const page = await device(browser, `/q/${id}/${station}`);
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible({ timeout: 15_000 });
-  // Staff devices keep a copy of the queue once it arrives; only then can they take over.
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect
     .poll(() => page.evaluate((id) => !!localStorage.getItem(`pizza-queue:copy:${id}`), id))
     .toBe(true);
@@ -42,14 +41,19 @@ async function order(page: Page, pizzas: string[], customer: string) {
   await page.getByRole('button', { name: 'Send to kitchen' }).click();
 }
 
+async function sentNumber(page: Page) {
+  await expect(page.locator('.sent strong').first()).toHaveText(/#\d+/, { timeout: 20_000 });
+  return Number((await page.locator('.sent strong').first().innerText()).replace('#', ''));
+}
+
 function stationOrder(page: Page, number: number) {
   return page.locator('.kitchen-order', { has: page.locator('.num', { hasText: `#${number}` }) });
 }
 
-async function markAll(page: Page, number: number, button: 'Prepared' | 'Baked') {
+async function markAll(page: Page, number: number, button: 'Prepared' | 'Baked', online = true) {
   const card = stationOrder(page, number);
   const buttons = card.getByRole('button', { name: button, exact: true });
-  await expect(buttons.first()).toBeVisible();
+  await expect(buttons.first()).toBeVisible({ timeout: 20_000 });
   for (let n = await buttons.count(); n > 0; n--) {
     // A tap that lands while the list redraws (a change from another device arriving) can
     // miss, as on a real screen; tap again then.
@@ -58,27 +62,27 @@ async function markAll(page: Page, number: number, button: 'Prepared' | 'Baked')
       await expect(buttons).toHaveCount(n - 1, { timeout: 2000 });
     }).toPass({ timeout: 15_000 });
   }
+  if (online) await saved(page);
+}
+
+/** Waits until a device's own changes are saved online (it shows them straight away). */
+async function saved(page: Page) {
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible({ timeout: 20_000 });
 }
 
 test('orders, kitchen, oven and counter on separate devices work on one queue', async ({ browser }) => {
-  const { host, id } = await startQueue(browser);
-  await host.goto(`/${BROKER}#/q/${id}/counter`);
+  const { first, id } = await startQueue(browser);
+  await first.goto(`/${EMULATOR}#/q/${id}/counter`);
   const orders = await join(browser, id, 'take');
   const orders2 = await join(browser, id, 'take');
   const kitchen = await join(browser, id, 'kitchen');
   const oven = await join(browser, id, 'oven');
-  await expect(host.getByText('Hosting · 4 devices')).toBeVisible({ timeout: 20_000 });
 
   // Two order takers at once still get different numbers.
   await Promise.all([order(orders, ['Margherita', 'Funghi'], 'Anna'), order(orders2, ['Diavola'], 'Bram')]);
-  await expect(orders.locator('.sent')).toContainText(/Order #\d sent/);
-  await expect(orders2.locator('.sent')).toContainText(/Order #\d sent/);
-  const numbers = [
-    Number((await orders.locator('.sent strong').first().innerText()).replace('#', '')),
-    Number((await orders2.locator('.sent strong').first().innerText()).replace('#', '')),
-  ].sort();
-  expect(numbers).toEqual([1, 2]);
-  const anna = numbers[0] === 1 && (await orders.locator('.sent strong').first().innerText()) === '#1' ? 1 : 2;
+  const anna = await sentNumber(orders);
+  const bram = await sentNumber(orders2);
+  expect([anna, bram].sort()).toEqual([1, 2]);
 
   // The kitchen gets both orders and prepares Anna's.
   await expect(kitchen.locator('.kitchen-order')).toHaveCount(2);
@@ -87,7 +91,7 @@ test('orders, kitchen, oven and counter on separate devices work on one queue', 
 
   // The oven bakes it, then the counter calls it.
   await markAll(oven, anna, 'Baked');
-  const card = host.locator('app-order-card', { hasText: `#${anna}` });
+  const card = first.locator('app-order-card', { hasText: `#${anna}` });
   await card.getByRole('button', { name: 'Ready for customer' }).click();
 
   // Every device sees the same queue.
@@ -97,115 +101,143 @@ test('orders, kitchen, oven and counter on separate devices work on one queue', 
   await expect(oven.locator('.kitchen-order')).toHaveCount(0);
 });
 
-test('when the host is gone, another device takes over and the work goes on', async ({ browser }) => {
-  const { host, id } = await startQueue(browser);
-  const hostContext = host.context();
+test('no device has to stay open: the one that started the queue can leave', async ({ browser }) => {
+  const { first, id } = await startQueue(browser);
+  const firstContext = first.context();
   const orders = await join(browser, id, 'take');
   const kitchen = await join(browser, id, 'kitchen');
   const oven = await join(browser, id, 'oven');
   await order(orders, ['Margherita'], 'Anna');
-  await expect(orders.locator('.sent')).toContainText('Order #1 sent');
-  await expect(kitchen.locator('.kitchen-order')).toHaveCount(1);
+  expect(await sentNumber(orders)).toBe(1);
 
-  // The host's tab closes: the others notice and offer to take over.
-  await host.close();
-  for (const page of [orders, kitchen, oven]) {
-    await expect(page.getByText(/host is offline/)).toBeVisible({ timeout: 20_000 });
-  }
+  // The device that started the queue closes; nobody is asked to take over.
+  await first.close();
+  await expect(kitchen.getByRole('button', { name: 'Become host' })).toHaveCount(0);
 
-  // The kitchen takes over.
-  await kitchen.getByRole('button', { name: 'Become host' }).click();
-  await expect(kitchen.getByText('This tab holds the queue')).toBeVisible({ timeout: 20_000 });
-  for (const page of [orders, oven]) {
-    await expect(page.getByText(/host is offline/)).toBeHidden({ timeout: 20_000 });
-    await expect(page.getByRole('button', { name: 'Become host' })).toHaveCount(0);
-  }
-
-  // Work goes on with the new host: numbers continue and every station follows.
+  // Work goes on: numbers continue and every station follows.
   await order(orders, ['Funghi'], 'Bram');
-  await expect(orders.locator('.sent')).toContainText('Order #2 sent', { timeout: 20_000 });
+  await expect(orders.locator('.sent strong').first()).toHaveText('#2', { timeout: 20_000 });
   await expect(kitchen.locator('.kitchen-order')).toHaveCount(2);
   await markAll(kitchen, 2, 'Prepared');
   await expect(stationOrder(oven, 2)).toBeVisible();
   await markAll(oven, 2, 'Baked');
 
-  // The old host comes back: it follows the new host instead of overwriting the queue.
-  const back = await hostContext.newPage();
-  await back.goto(`/${BROKER}#/q/${id}/kitchen`);
+  // Settings can be changed from any device now, and apply everywhere.
+  await kitchen.getByRole('navigation').getByRole('link', { name: 'Settings' }).click();
+  await kitchen.getByLabel('Price per pizza').fill('12');
+  await kitchen.getByRole('button', { name: 'Save settings' }).click();
+  await expect(kitchen.getByText('Saved.')).toBeVisible();
+  await orders.locator('.menu-item', { hasText: 'Margherita' }).click();
+  await expect(orders.locator('.totals')).toContainText('1 × €12.00', { timeout: 20_000 });
+
+  // It comes back later and has everything.
+  const back = await firstContext.newPage();
+  await back.goto(`/${EMULATOR}#/q/${id}/kitchen`);
   await expect(back.locator('.kitchen-order')).toHaveCount(1, { timeout: 20_000 });
   await expect(stationOrder(back, 1)).toBeVisible();
-  await expect(back.getByText('This tab holds the queue')).toHaveCount(0);
-  await expect(kitchen.getByText('This tab holds the queue')).toBeVisible();
-  await order(orders, ['Diavola'], 'Chris');
-  await expect(orders.locator('.sent')).toContainText('Order #3 sent', { timeout: 20_000 });
+  await order(orders, [], 'Chris');
+  await expect(orders.locator('.sent strong').first()).toHaveText('#3', { timeout: 20_000 });
   await expect(back.locator('.kitchen-order')).toHaveCount(2);
 });
 
-test('two devices pressing "Become host" at once end up with exactly one host', async ({ browser }) => {
-  const { host, id } = await startQueue(browser);
-  const a = await join(browser, id, 'kitchen');
-  const b = await join(browser, id, 'oven');
-  await host.close();
-  for (const page of [a, b]) await expect(page.getByText(/host is offline/)).toBeVisible({ timeout: 20_000 });
-  await Promise.all([
-    a.getByRole('button', { name: 'Become host' }).click(),
-    b.getByRole('button', { name: 'Become host' }).click(),
-  ]);
-  await expect(async () => {
-    const hosts = [
-      await a.getByText('This tab holds the queue').count(),
-      await b.getByText('This tab holds the queue').count(),
-    ];
-    expect(hosts.reduce((x, y) => x + y)).toBe(1);
-  }).toPass({ timeout: 20_000 });
-  // The other one follows the winner.
-  for (const page of [a, b]) await expect(page.getByText(/host is offline/)).toBeHidden({ timeout: 20_000 });
-});
-
-test('a host that loses its connection and comes back after a takeover follows the new host', async ({
-  browser,
-}) => {
-  const { host, id } = await startQueue(browser);
+test('a device without internet keeps working and catches up when it is back', async ({ browser }) => {
+  const { first, id } = await startQueue(browser);
+  await first.goto(`/${EMULATOR}#/q/${id}/take`);
   const orders = await join(browser, id, 'take');
   const kitchen = await join(browser, id, 'kitchen');
+  const oven = await join(browser, id, 'oven');
   await order(orders, ['Margherita'], 'Anna');
-  await expect(orders.locator('.sent')).toContainText('Order #1 sent');
-  await host.getByRole('navigation').getByRole('link', { name: 'Orders', exact: true }).click();
+  expect(await sentNumber(orders)).toBe(1);
+  await expect(kitchen.locator('.kitchen-order')).toHaveCount(1);
 
-  // The host's wifi drops while its tab stays open, and it keeps taking orders.
-  await host.context().setOffline(true);
-  await order(host, ['Hawaii'], 'Olivia');
-  await expect(host.locator('.sent')).toContainText('Order #2 sent');
+  // The order taker's and the kitchen's wifi drop.
+  await orders.context().setOffline(true);
+  await kitchen.context().setOffline(true);
+  await expect(orders.getByText('No internet connection')).toBeVisible();
 
-  // The others notice once the host has been silent for a while, and the kitchen takes over.
-  await expect(kitchen.getByText(/host is offline/)).toBeVisible({ timeout: 90_000 });
-  await kitchen.getByRole('button', { name: 'Become host' }).click();
-  await expect(kitchen.getByText('This tab holds the queue')).toBeVisible({ timeout: 20_000 });
-  await order(orders, ['Funghi'], 'Bram');
-  await expect(orders.locator('.sent')).toContainText('Order #2 sent', { timeout: 20_000 });
+  // The order taker takes an order: it waits for a number. The kitchen prepares Anna's.
+  await order(orders, ['Hawaii'], 'Olivia');
+  await expect(orders.getByText('Sending order…')).toBeVisible();
+  await markAll(kitchen, 1, 'Prepared', false);
 
-  // Its connection comes back: it follows the new host, and the order it took offline isn't
-  // lost but gets the next number.
-  await host.context().setOffline(false);
-  await expect(host.getByText('This tab holds the queue')).toHaveCount(0, { timeout: 30_000 });
-  await expect(host.locator('.sent')).toContainText('Order #3 sent', { timeout: 30_000 });
-  await expect(kitchen.getByText('This tab holds the queue')).toBeVisible();
-  await expect(kitchen.locator('.kitchen-order')).toHaveCount(3);
+  // Meanwhile another order taker that's online goes first.
+  await order(first, ['Funghi'], 'Bram');
+  expect(await sentNumber(first)).toBe(2);
+  await expect(stationOrder(oven, 1)).toHaveCount(0);
+
+  // Back online: the waiting order gets the next number, the kitchen's taps arrive, and
+  // nothing is lost.
+  await orders.context().setOffline(false);
+  await kitchen.context().setOffline(false);
+  expect(await sentNumber(orders)).toBe(3);
+  await expect(stationOrder(oven, 1)).toBeVisible({ timeout: 20_000 });
+  await expect(kitchen.locator('.kitchen-order')).toHaveCount(2);
   await expect(stationOrder(kitchen, 3)).toContainText('Olivia');
-  await order(orders, ['Diavola'], 'Chris');
-  await expect(orders.locator('.sent')).toContainText('Order #4 sent', { timeout: 20_000 });
-  await host.getByRole('navigation').getByRole('link', { name: 'Kitchen', exact: true }).click();
-  await expect(host.locator('.kitchen-order')).toHaveCount(4);
 });
 
-test('the host reloading its page does not make the others offer to take over', async ({ browser }) => {
-  const { host, id } = await startQueue(browser);
+test('an order taken without internet is kept when the page is reloaded', async ({ browser }) => {
+  const { first, id } = await startQueue(browser);
+  await first.goto(`/${EMULATOR}#/q/${id}/take`);
   const kitchen = await join(browser, id, 'kitchen');
-  await host.reload();
-  await expect(host.getByText(/Hosting/)).toBeVisible();
-  for (let i = 0; i < 8; i++) {
-    await expect(kitchen.getByRole('button', { name: 'Become host' })).toHaveCount(0);
-    await kitchen.waitForTimeout(1000);
+  await first.context().setOffline(true);
+  await order(first, ['Margherita'], 'Anna');
+  await expect(first.getByText('Sending order…')).toBeVisible();
+  // The tab is closed before the connection is back; the order waits on the device.
+  const context = first.context();
+  await first.close();
+  await context.setOffline(false);
+  await expect(kitchen.locator('.kitchen-order')).toHaveCount(0);
+  const again = await context.newPage();
+  await again.goto(`/${EMULATOR}#/q/${id}/take`);
+  await expect(kitchen.locator('.kitchen-order')).toHaveCount(1, { timeout: 20_000 });
+  await expect(stationOrder(kitchen, 1)).toContainText('Anna');
+});
+
+test('two order takers together cannot sell more pizzas than there are', async ({ browser }) => {
+  const { first, id } = await startQueue(browser, 3);
+  await first.goto(`/${EMULATOR}#/q/${id}/take`);
+  const other = await join(browser, id, 'take');
+  await expect(other.getByText('3 pizzas left')).toBeVisible();
+  // Both fill in an order and send it at the same moment.
+  for (const [page, pizzas] of [[first, ['Margherita', 'Funghi']], [other, ['Diavola', 'Hawaii']]] as const) {
+    for (const p of pizzas) await page.locator('.menu-item', { hasText: p }).click();
   }
-  await expect(kitchen.getByText('Connected', { exact: true })).toBeVisible();
+  await Promise.all([first, other].map((p) => p.getByRole('button', { name: 'Send to kitchen' }).click()));
+  // One of them gets the order in; the other is told and gets its order back to fix.
+  await expect(async () => {
+    const sent =
+      (await first.locator('.sent:not(.refused):not(.pending)').count()) +
+      (await other.locator('.sent:not(.refused):not(.pending)').count());
+    const refused =
+      (await first.locator('.sent.refused').count()) + (await other.locator('.sent.refused').count());
+    expect([sent, refused]).toEqual([1, 1]);
+  }).toPass({ timeout: 20_000 });
+  for (const page of [first, other]) await expect(page.getByText('1 pizza left', { exact: true })).toBeVisible();
+});
+
+test("a customer's phone follows the order as the stations work on it", async ({ browser }) => {
+  const { first, id } = await startQueue(browser);
+  await first.goto(`/${EMULATOR}#/q/${id}/take`);
+  const kitchen = await join(browser, id, 'kitchen');
+  const oven = await join(browser, id, 'oven');
+  await order(first, ['Margherita'], 'Anna');
+  expect(await sentNumber(first)).toBe(1);
+  const orderId = await first.evaluate((id) => {
+    const state = JSON.parse(localStorage.getItem(`pizza-queue:copy:${id}`)!);
+    return state.orders[0].id as string;
+  }, id);
+
+  // The customer's phone isn't staff: it only gets the tracking link.
+  const phone = await device(browser, `/track/${orderId}`);
+  await expect(phone.locator('.track')).toContainText('Anna', { timeout: 20_000 });
+  await markAll(kitchen, 1, 'Prepared');
+  await markAll(oven, 1, 'Baked');
+  await first.getByRole('navigation').getByRole('link', { name: 'Counter' }).click();
+  await first
+    .locator('app-order-card', { hasText: '#1' })
+    .getByRole('button', { name: 'Ready for customer' })
+    .click();
+  await expect(phone.locator('.track')).toHaveClass(/is-ready/, { timeout: 20_000 });
+  const copies = await phone.evaluate(() => Object.keys(localStorage).filter((k) => k.includes(':copy:')));
+  expect(copies).toEqual([]);
 });

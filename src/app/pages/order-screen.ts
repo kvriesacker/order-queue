@@ -92,7 +92,7 @@ const DRAFT_MAX_AGE = 60 * 60000;
         </div>
       }
       <footer class="os-footer">
-        @if (queue.connection() !== 'online') {
+        @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
           <span class="pill offline">Offline</span>
         }
         <button type="button" (click)="fullscreen()">Full screen</button>

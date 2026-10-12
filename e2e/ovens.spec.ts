@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 function tab(page: Page, name: string) {
   return page.getByRole('navigation').getByRole('link', { name, exact: true });

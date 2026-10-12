@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-// Browser tests run against the production build (`ng build` first). They use one tab as
-// the queue's host, which works without a broker, so no network is needed.
+// Browser tests run against the production build (`ng build` first) and a local Firebase
+// emulator (needs Java), so they never touch the real Firebase project.
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
@@ -17,7 +17,11 @@ export default defineConfig({
   ],
   webServer: [
     { command: 'node e2e/serve.mjs', url: 'http://127.0.0.1:4321/', reuseExistingServer: !process.env['CI'] },
-    // A local broker for the tests that run several devices together.
-    { command: 'node e2e/broker.mjs', url: 'http://127.0.0.1:8884/', reuseExistingServer: !process.env['CI'] },
+    {
+      command: 'npx firebase emulators:start --only firestore,auth --project demo-pizza-queue',
+      url: 'http://127.0.0.1:8085/',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 180_000,
+    },
   ],
 });

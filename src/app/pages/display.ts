@@ -53,7 +53,7 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
           }
         </span>
         <span class="display-controls">
-          @if (queue.connection() !== 'online') {
+          @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
             <span class="pill offline">Offline</span>
           }
           <button type="button" (click)="toggleSound()">

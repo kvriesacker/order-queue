@@ -68,7 +68,7 @@ export interface QueueState {
   soldClearedByType: Record<string, number>;
   /** Ovens marked out of order by the oven station (0 is the first oven). */
   ovensOut: number[];
-  /** Goes up by one each time another device takes over as host. */
+  /** From the earlier version, where one device held the queue: up by one per takeover. */
   hostEpoch: number;
   /** Identifies the device hosting this epoch (a random id it keeps with its saved queue). */
   hostId: string;

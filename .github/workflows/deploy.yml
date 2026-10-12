@@ -24,6 +24,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The browser tests run against the local Firebase emulator, which needs Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - run: npx ng test --watch=false
       - run: npx ng build
       # Browser tests against the build (color picker and more); a failure stops the deploy.

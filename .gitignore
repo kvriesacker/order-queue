@@ -46,3 +46,6 @@ Thumbs.db
 # Browser test results
 /test-results
 /playwright-report
+
+# Firebase emulator logs
+*-debug.log

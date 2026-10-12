@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Nothing listens on this port, so the app never reaches a public broker during tests.
-const START = '?broker=ws://127.0.0.1:9#/';
+// The local Firebase emulator started by the Playwright config, never the real project.
+const START = '?emulator=127.0.0.1#/';
 
 function tab(page: Page, name: string) {
   return page.getByRole('navigation').getByRole('link', { name, exact: true });
@@ -83,13 +83,13 @@ test('the QR code shown while ordering is for the order that gets sent', async (
   await page.getByRole('button', { name: 'Send to kitchen' }).click();
   await expect(page.getByText(/Order #1 sent/)).toBeVisible();
   const sent = await page.evaluate((id) => {
-    const state = JSON.parse(localStorage.getItem(`pizza-queue:host:${id}`)!);
+    const state = JSON.parse(localStorage.getItem(`pizza-queue:copy:${id}`)!);
     return state.orders[0].id as string;
   }, queueId);
   expect(sent).toBe(drafted);
 
   // The phone page for that id is the order's own page (it waits for the order to show up).
   const phone = await context.newPage();
-  await phone.goto(`/?broker=ws://127.0.0.1:9#/track/${sent}`);
+  await phone.goto(`/?emulator=127.0.0.1#/track/${sent}`);
   await expect(phone.locator('.track')).toBeVisible();
 });
