@@ -201,20 +201,27 @@ import { OrderCard } from './order-card';
             again.
           </p>
         } @else if (lastNumber()) {
-          <p class="sent">
-            Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
-            @if (lastTotal()) {
-              <br />To pay: <strong>{{ price(lastTotal()) }}</strong>
+          <div class="sent">
+            <p>
+              Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
+              @if (lastTotal()) {
+                <br />To pay: <strong>{{ price(lastTotal()) }}</strong>
+              }
+              @if (lastEta(); as t) {
+                <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
+              }
+            </p>
+            @if (!cart().length) {
+              <div class="sent-actions">
+                <button class="btn small" type="button" (click)="showQr.set(!showQr())">
+                  {{ showQr() ? 'Hide QR code' : 'Show QR code' }}
+                </button>
+                <button class="btn small primary" type="button" (click)="nextCustomer()">
+                  Next customer
+                </button>
+              </div>
             }
-            @if (lastEta(); as t) {
-              <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
-            }
-          </p>
-          @if (!cart().length) {
-            <button class="btn qr-again" type="button" (click)="showQr.set(!showQr())">
-              {{ showQr() ? 'Hide QR code' : 'Show QR code' }}
-            </button>
-          }
+          </div>
         } @else if (lastId()) {
           <p class="sent pending">Sending order…</p>
         }
@@ -420,6 +427,15 @@ export class Take {
       ? parts.filter((n) => n.toLowerCase() !== quick.toLowerCase())
       : [...parts, quick];
     this.setNote(index, next.join(', '));
+  }
+
+  /**
+   * The customer has gone and the next order hasn't started: the customer screen goes back
+   * to "Next customer". (The order is in Open orders.)
+   */
+  nextCustomer() {
+    this.lastId.set('');
+    this.lastCart = null;
   }
 
   send() {

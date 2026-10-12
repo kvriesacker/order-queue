@@ -1554,8 +1554,14 @@ input.swatch {
   color: var(--tomato-dark);
   margin: 0 0 1rem;
 }
-.qr-again {
-  align-self: flex-start;
+.sent p {
+  margin: 0;
+}
+.sent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
 }
 .oven strong,
 .oven-state,

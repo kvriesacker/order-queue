@@ -50,6 +50,14 @@ test('the customer screen follows the order as it is taken', async ({ page, cont
   await page.getByRole('button', { name: 'Show QR code' }).click();
   await expect(screen.locator('.qr svg')).toBeVisible();
 
+  // The customer has gone: Next customer clears the screen before the next order starts.
+  await page.locator('.sent').getByRole('button', { name: 'Next customer' }).click();
+  await expect(screen.getByText('Next customer')).toBeVisible();
+  await expect(screen.locator('.qr svg')).toHaveCount(0);
+  await expect(screen.locator('.os-number')).toHaveCount(0);
+  await expect(page.locator('.sent')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Open orders/ })).toContainText('1');
+
   // The next customer's order takes over the screen.
   await page.locator('.menu-item', { hasText: 'Diavola' }).click();
   await expect(lines).toHaveText([/1× Diavola/]);
