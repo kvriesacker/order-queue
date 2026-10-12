@@ -1,4 +1,16 @@
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { renderSVG } from 'uqr';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { T, t } from '../i18n/i18n';
@@ -29,8 +41,8 @@ import { focusMode } from '../focus';
           <span class="pill left low">{{ 'Sold out' | t }}</span>
         }
         <span class="pill" [class]="pill().kind">{{ pill().text | t }}</span>
-        <button class="btn" type="button" (click)="share()">
-          {{ (copied() ? 'Link copied' : 'Share link') | t }}
+        <button class="btn" type="button" aria-haspopup="dialog" (click)="openShare()">
+          {{ 'Share link' | t }}
         </button>
         <app-lang-switch />
       </div>
@@ -44,12 +56,38 @@ import { focusMode } from '../focus';
       </p>
     }
     <router-outlet />
+    <dialog #shareDialog class="share-dialog" aria-labelledby="share-title" (close)="sharing.set(false)">
+      @if (sharing()) {
+        <h2 id="share-title">{{ 'Invite your team' | t }}</h2>
+        <p class="muted">{{ 'Scan this code with another phone or tablet to work along in this queue.' | t }}</p>
+        <div class="qr share-qr" [innerHTML]="qr()"></div>
+        <p class="share-link">{{ link() }}</p>
+        <div class="share-actions">
+          <button class="btn primary big" type="button" (click)="copy()">
+            {{ (copied() ? '✓ Link copied' : 'Copy link') | t }}
+          </button>
+          @if (canShare) {
+            <button class="btn" type="button" (click)="share()">{{ 'Send…' | t }}</button>
+          }
+          <button class="btn ghost" type="button" (click)="shareDialog.close()">{{ 'Close' | t }}</button>
+        </div>
+      }
+    </dialog>
   `,
 })
 export class Shell {
   protected queue = inject(QueueService);
   readonly id = input.required<string>();
   protected copied = signal(false);
+  protected sharing = signal(false);
+  private shareDialog = viewChild.required<ElementRef<HTMLDialogElement>>('shareDialog');
+  protected canShare = typeof navigator !== 'undefined' && !!navigator.share;
+  protected link = computed(() => this.queue.shareLink(this.queue.state()?.id));
+  /** Our own SVG made from our own link, so it's safe to insert. */
+  protected qr = computed(() =>
+    this.sanitizer.bypassSecurityTrustHtml(renderSVG(this.link(), { border: 2 })),
+  );
+  private sanitizer = inject(DomSanitizer);
   protected focus = focusMode;
 
   protected pill = computed(() => {
@@ -69,24 +107,31 @@ export class Shell {
     });
   }
 
-  async share() {
-    const link = this.queue.shareLink();
-    const data = { title: t('Pizza queue'), text: t('Join our pizza order queue'), url: link };
-    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-      try {
-        await navigator.share(data);
-        return;
-      } catch {
-        // Fall back to copying.
-      }
-    }
+  /** Shows the queue link as a QR code for other staff to scan, with a button to copy it. */
+  protected openShare() {
+    this.copied.set(false);
+    this.sharing.set(true);
+    this.shareDialog().nativeElement.showModal();
+  }
+
+  async copy() {
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(this.link());
     } catch {
-      prompt(t('Copy this link'), link);
+      prompt(t('Copy this link'), this.link());
       return;
     }
     this.copied.set(true);
     setTimeout(() => this.copied.set(false), 2000);
+  }
+
+  /** The phone's own share sheet (WhatsApp, mail, …), where there is one. */
+  async share() {
+    const data = { title: t('Pizza queue'), text: t('Join our pizza order queue'), url: this.link() };
+    try {
+      await navigator.share(data);
+    } catch {
+      // Cancelled: the dialog stays open to copy the link instead.
+    }
   }
 }

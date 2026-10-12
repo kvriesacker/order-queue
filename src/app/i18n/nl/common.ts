@@ -21,7 +21,12 @@ export const NL_COMMON: Record<string, string> = {
   'Connecting…': 'Verbinden…',
   'Saving…': 'Opslaan…',
   Connected: 'Verbonden',
-  'Link copied': 'Link gekopieerd',
+  '✓ Link copied': '✓ Link gekopieerd',
+  'Copy link': 'Link kopiëren',
+  'Invite your team': 'Nodig je team uit',
+  'Scan this code with another phone or tablet to work along in this queue.': 'Scan deze code met een andere gsm of tablet om mee te werken in deze wachtrij.',
+  'Send…': 'Versturen…',
+  'Close': 'Sluiten',
   'Share link': 'Link delen',
   'No internet connection. Changes are sent when it’s back.':
     'Geen internetverbinding. Wijzigingen worden verstuurd zodra die terug is.',
