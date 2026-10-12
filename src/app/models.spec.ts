@@ -53,6 +53,31 @@ describe('applyAction', () => {
     expect(normalizeState({ ...s, ovensOut: undefined } as unknown as QueueState).ovensOut).toEqual([]);
   });
 
+  it('lets the counter hand over baked pizzas of a big order before the rest is done', () => {
+    let s = applyAction(empty, { ...add('a'), items: [{ name: 'Margherita', qty: 3, note: '', color: '#e53935' }] });
+    const pizza = (unit: number, status: 'new' | 'prepared' | 'baked'): QueueAction =>
+      ({ type: 'pizza', id: 'a', item: 0, unit, status });
+    const hand = (unit: number, handed = true): QueueAction => ({ type: 'hand', id: 'a', item: 0, unit, handed });
+    s = applyAction(applyAction(s, pizza(0, 'prepared')), pizza(0, 'baked'));
+    // Only a baked pizza can be handed over.
+    expect(applyAction(s, hand(1))).toBe(s);
+    s = applyAction(s, hand(0), 5);
+    expect(s.orders[0].items[0].times[0].handed).toBe(5);
+    expect(s.orders[0].status).toBe('in-progress');
+    // The customer has it: the oven can't take it back, and moving the order back keeps it.
+    expect(applyAction(s, pizza(0, 'prepared'))).toBe(s);
+    const back = applyAction(s, { type: 'status', id: 'a', status: 'new' });
+    expect(back.orders[0].items[0].units).toEqual(['baked', 'new', 'new']);
+    expect(back.orders[0].items[0].times[0].handed).toBe(5);
+    // Undo, then hand it over again.
+    expect(applyAction(s, hand(0, false)).orders[0].items[0].times[0].handed).toBeUndefined();
+    // Once the customer has every pizza, the order is picked up.
+    for (const u of [1, 2]) s = applyAction(applyAction(s, pizza(u, 'prepared')), pizza(u, 'baked'));
+    expect(s.orders[0].status).toBe('ready');
+    s = applyAction(applyAction(s, hand(1)), hand(2));
+    expect(s.orders[0].status).toBe('collected');
+  });
+
   it('keeps the language for joining devices and customer screens; old queues speak Dutch', () => {
     expect(normalizeState(empty).lang).toBe('nl');
     const s = applyAction(empty, { type: 'lang', lang: 'en' });

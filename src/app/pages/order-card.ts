@@ -19,6 +19,8 @@ import { T, dateLocale, t } from '../i18n/i18n';
       <header class="eta-row">
         <app-eta [orderId]="order().id" />
       </header>
+      <ng-content select="[pizzas]" />
+      @if (showItems()) {
       <ul class="items">
         @for (item of order().items; track $index) {
           <li>
@@ -30,6 +32,7 @@ import { T, dateLocale, t } from '../i18n/i18n';
           </li>
         }
       </ul>
+      }
       @if (order().note) {
         <p class="order-note">{{ order().note }}</p>
       }
@@ -44,6 +47,8 @@ export class OrderCard {
   private queue = inject(QueueService);
   readonly order = input.required<Order>();
   readonly showStatus = input(false);
+  /** Off where the page lists the pizzas itself (the counter, pizza by pizza). */
+  readonly showItems = input(true);
   protected labels = STATUS_LABELS;
 
   protected time = computed(() =>

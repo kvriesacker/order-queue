@@ -46,4 +46,14 @@ export const NL_COMMON: Record<string, string> = {
   'Language for devices that join': 'Taal voor toestellen die meedoen',
   'Customer screens and the order follow page always use this language. Staff can still switch their own device with NL / EN at the top.':
     'Klantenschermen en de volgpagina van een bestelling gebruiken altijd deze taal. Medewerkers kunnen hun eigen toestel nog wisselen met NL / EN bovenaan.',
+  // Counter: handing over part of a big order
+  'In the oven': 'In de oven',
+  'Hand over': 'Meegeven',
+  'Hand over {pizza}': '{pizza} meegeven',
+  '✓ Handed over': '✓ Meegegeven',
+  'Undo handing over {pizza}': '{pizza} meegeven ongedaan maken',
+  // Kitchen and oven in full screen
+  'Exit full screen': 'Volledig scherm sluiten',
+  '+{n} pizza still in the kitchen': '+{n} pizza nog in de keuken',
+  '+{n} pizzas still in the kitchen': "+{n} pizza's nog in de keuken",
 };

@@ -310,6 +310,11 @@ export class QueueService {
     this.dispatch({ type: 'pizza', id: order.id, item, unit, status });
   }
 
+  /** The counter gives one baked pizza to the customer, or takes that back. */
+  handOver(order: Order, item: number, unit: number, handed: boolean): void {
+    this.dispatch({ type: 'hand', id: order.id, item, unit, handed });
+  }
+
   setStatus(order: Order, status: Order['status']): void {
     this.dispatch({ type: 'status', id: order.id, status });
   }

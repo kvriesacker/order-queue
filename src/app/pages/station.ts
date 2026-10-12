@@ -1,10 +1,11 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, DestroyRef, computed, inject, input } from '@angular/core';
 import { Order, PizzaStatus, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { TypeLimits } from './type-limits';
 import { Ovens } from './ovens';
 import { T, t } from '../i18n/i18n';
+import { enterFocus, focusMode, leaveFocus } from '../focus';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -28,7 +29,6 @@ const STATIONS = {
     to: 'prepared' as PizzaStatus,
     action: 'Prepared',
     progress: '{done}/{total} prepared',
-    done: '✓ Prepared',
     recent: 'Just prepared',
   },
   oven: {
@@ -38,25 +38,28 @@ const STATIONS = {
     to: 'baked' as PizzaStatus,
     action: 'Baked',
     progress: '{done}/{total} baked',
-    done: '✓ Baked',
     recent: 'Just baked',
   },
 };
 
-const OTHER_STEP: Record<PizzaStatus, string> = {
-  new: 'In the kitchen',
-  prepared: 'Prepared',
-  baked: 'Baked',
-};
 
 @Component({
   selector: 'app-station',
   imports: [Eta, TypeLimits, Ovens, T],
   template: `
-    <main class="page kitchen">
+    <main class="page kitchen" [class.focus]="focus()">
       <section class="column">
-        <h2>
+        <h2 class="station-head">
           {{ config().title | t }} <span class="count">{{ waiting() }}</span>
+          @if (focus()) {
+            <button class="btn ghost small focus-toggle" type="button" (click)="leaveFocus()">
+              {{ 'Exit full screen' | t }}
+            </button>
+          } @else {
+            <button class="btn small focus-toggle" type="button" (click)="enterFocus()">
+              ⛶ {{ 'Full screen' | t }}
+            </button>
+          }
         </h2>
         <div class="kitchen-grid one-column">
           @for (entry of active(); track entry.order.id) {
@@ -75,8 +78,9 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
               @if (entry.order.note) {
                 <p class="order-note">{{ entry.order.note }}</p>
               }
+              <!-- Only what's left to tick off: a ticked pizza moves to the list on the right. -->
               <ul class="pizzas">
-                @for (p of entry.pizzas; track p.item + '-' + p.unit) {
+                @for (p of entry.todoPizzas; track p.item + '-' + p.unit) {
                   <li [class]="rowClass(p)">
                     <span class="chip" [style.background]="p.color" [style.color]="textOn(p.color)">
                       {{ p.name }}
@@ -87,30 +91,22 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                       }
                     </span>
                     <span class="pizza-actions">
-                      @if (p.status === config().from) {
-                        <button
-                          class="btn success"
-                          type="button"
-                          (click)="set(entry.order, p, config().to)"
-                        >
-                          {{ config().action | t }}
-                        </button>
-                      } @else if (p.status === config().to) {
-                        <span class="done">{{ config().done | t }}</span>
-                        <button
-                          class="btn ghost small"
-                          type="button"
-                          (click)="set(entry.order, p, config().from)"
-                        >
-                          {{ 'Undo' | t }}
-                        </button>
-                      } @else {
-                        <span class="muted">{{ otherStep[p.status] | t }}</span>
-                      }
+                      <button
+                        class="btn success"
+                        type="button"
+                        (click)="set(entry.order, p, config().to)"
+                      >
+                        {{ config().action | t }}
+                      </button>
                     </span>
                   </li>
                 }
               </ul>
+              @if (entry.earlier) {
+                <p class="muted still-earlier">
+                  {{ (entry.earlier === 1 ? '+{n} pizza still in the kitchen' : '+{n} pizzas still in the kitchen') | t: { n: entry.earlier } }}
+                </p>
+              }
             </article>
           } @empty {
             <p class="muted">{{ config().empty | t }}</p>
@@ -142,11 +138,14 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
             <li class="muted">{{ 'Nothing yet.' | t }}</li>
           }
         </ul>
-        @if (station() === 'oven') {
+        @if (focus()) {
+          <!-- Full screen: only the pizzas to tick off and the ones just ticked. -->
+        } @else if (station() === 'oven') {
           <h2>{{ 'Ovens' | t }}</h2>
           <app-ovens />
         }
-        @if (station() === 'kitchen') {
+        @if (focus()) {
+        } @else if (station() === 'kitchen') {
           <h2>
             {{ 'Coming up for the oven' | t }} <span class="count">{{ forOven().length }}</span>
           </h2>
@@ -189,7 +188,16 @@ export class Station {
   readonly station = input<'kitchen' | 'oven'>('kitchen');
   protected config = computed(() => STATIONS[this.station()]);
   protected textOn = textOn;
-  protected otherStep = OTHER_STEP;
+  protected focus = focusMode;
+  protected enterFocus = enterFocus;
+  protected leaveFocus = leaveFocus;
+
+  constructor() {
+    // Full screen belongs to this page; going to another tab shows the menu again.
+    inject(DestroyRef).onDestroy(() => {
+      if (focusMode()) leaveFocus();
+    });
+  }
 
   /** Orders with at least one pizza for this station, oldest first. */
   protected active = computed(() => {
@@ -199,10 +207,16 @@ export class Station {
       .filter((o) => o.status === 'new' || o.status === 'in-progress')
       .map((order) => {
         const pizzas = byType(pizzaRows(order), this.queue.state()?.menu ?? []);
-        return { order, pizzas, todo: pizzas.filter((p) => p.status === from).length, done: 0 };
+        const todoPizzas = pizzas.filter((p) => p.status === from);
+        return { order, pizzas, todoPizzas, todo: todoPizzas.length, done: 0, earlier: 0 };
       })
       .filter((e) => e.todo > 0)
-      .map((e) => ({ ...e, done: e.pizzas.filter((p) => isPast(p.status, to)).length }));
+      .map((e) => ({
+        ...e,
+        done: e.pizzas.filter((p) => isPast(p.status, to)).length,
+        // For the oven: pizzas of this order the kitchen hasn't prepared yet.
+        earlier: e.pizzas.filter((p) => !isPast(p.status, from)).length,
+      }));
   });
   /**
    * The pizzas this station marked most recently that are still at its step, newest first,
@@ -257,7 +271,7 @@ export class Station {
 }
 
 /** How many recently marked pizzas each station sees, to undo a mistake. */
-const RECENT = 6;
+const RECENT = 8;
 
 const ORDER: PizzaStatus[] = ['new', 'prepared', 'baked'];
 

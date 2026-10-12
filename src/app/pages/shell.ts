@@ -3,11 +3,13 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { T, t } from '../i18n/i18n';
 import { LangSwitch } from '../i18n/lang-switch';
+import { focusMode } from '../focus';
 
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, T, LangSwitch],
   template: `
+    @if (!focus()) {
     <header class="topbar">
       <a class="brand small" routerLink="/"
         ><span aria-hidden="true">🍕</span> {{ queue.state()?.name ?? ('Pizza queue' | t) }}</a
@@ -33,6 +35,7 @@ import { LangSwitch } from '../i18n/lang-switch';
         <app-lang-switch />
       </div>
     </header>
+    }
     @if (queue.connection() === 'offline') {
       <p class="banner">{{ 'No internet connection. Changes are sent when it’s back.' | t }}</p>
     } @else if (queue.connection() === 'no-backend') {
@@ -47,6 +50,7 @@ export class Shell {
   protected queue = inject(QueueService);
   readonly id = input.required<string>();
   protected copied = signal(false);
+  protected focus = focusMode;
 
   protected pill = computed(() => {
     const q = this.queue;
