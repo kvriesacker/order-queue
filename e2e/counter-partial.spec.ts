@@ -53,28 +53,44 @@ test('kitchen and oven in full screen show only what to tick off', async ({ page
   await expect(page.locator('app-type-limits')).toHaveCount(1);
 });
 
+async function bake(page: Page, pizzas: number) {
+  for (const [name, button] of [['Kitchen', 'Prepared'], ['Oven', 'Baked']]) {
+    await tab(page, name).click();
+    const rows = page.locator('.kitchen-order .pizzas li');
+    await expect(rows.first()).toBeVisible();
+    const start = await rows.count();
+    for (let n = 1; n <= pizzas; n++) {
+      await rows.first().getByRole('button', { name: button, exact: true }).click();
+      await expect(rows).toHaveCount(start - n);
+    }
+  }
+  await tab(page, 'Counter').click();
+}
+
+function column(page: Page, title: string) {
+  return page.locator('.column', { has: page.getByRole('heading', { name: new RegExp(title) }) });
+}
+
 test('the counter can show and hand over the baked pizzas of a big order before the rest is done', async ({ page, context }) => {
   await bigOrder(page);
   const queueId = page.url().split('/q/')[1].split('/')[0];
-  await tab(page, 'Kitchen').click();
-  await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
-  await tab(page, 'Oven').click();
-  await page.locator('.kitchen-order').getByRole('button', { name: 'Baked', exact: true }).click();
+  await bake(page, 1);
 
   // At the counter the partly baked order is with the ones from the kitchen.
-  await tab(page, 'Counter').click();
-  const making = page.locator('.making-col');
-  const fromKitchen = page.locator('.column', { hasText: 'From the kitchen' });
-  await expect(making).not.toContainText('#1');
+  const fromKitchen = column(page, 'From the kitchen');
+  const onScreen = column(page, 'On the customer screen');
+  await expect(page.locator('.making-col')).not.toContainText('#1');
   const card = fromKitchen.locator('app-order-card', { hasText: '#1' });
   await expect(card.locator('.counter-pizzas li')).toHaveText([
     /Margherita.*To customer screen/,
     /Funghi.*In the kitchen/,
     /Hawaii.*In the kitchen/,
   ]);
-  // The Margherita goes on the customer screen on its own.
+  // The Margherita goes on the customer screen on its own: the order is now in both columns.
   await card.getByRole('button', { name: 'Show Margherita on the customer screen' }).click();
-  await expect(card.locator('.counter-pizzas li').first()).toContainText('On the customer screen');
+  await expect(card.locator('.counter-pizzas li')).toHaveText([/Funghi/, /Hawaii/]);
+  const shown = onScreen.locator('app-order-card', { hasText: '#1' });
+  await expect(shown.locator('.counter-pizzas li')).toHaveText([/Margherita.*Hand over/]);
 
   const display = await context.newPage();
   await display.goto(`/?emulator=127.0.0.1#/q/${queueId}/display`);
@@ -83,34 +99,38 @@ test('the counter can show and hand over the baked pizzas of a big order before 
   await expect(block('Ready! Please collect')).toHaveText([/1\s*Anna\s*1× Margherita\s*Part of the order, the rest follows/]);
   await expect(block('Ordered')).toHaveText([/1\s*Anna\s*1× Funghi, 1× Hawaii\s*Rest of the order/]);
 
-  // Handed over: it leaves the Ready block.
-  await card.getByRole('button', { name: 'Hand over Margherita' }).click();
-  await expect(card.locator('.counter-pizzas li').first()).toContainText('Handed over');
+  // Handed over: it leaves the Ready block. A mistake can be undone.
+  await shown.getByRole('button', { name: 'Hand over Margherita' }).click();
+  await expect(shown.locator('.counter-pizzas li').first()).toContainText('Handed over');
   await expect(block('Ready! Please collect')).toHaveCount(0);
-  // A mistake can be undone.
-  await card.getByRole('button', { name: 'Undo handing over Margherita' }).click();
+  await shown.getByRole('button', { name: 'Undo handing over Margherita' }).click();
   await expect(block('Ready! Please collect')).toHaveCount(1);
-  await card.getByRole('button', { name: 'Hand over Margherita' }).click();
+  await shown.getByRole('button', { name: 'Hand over Margherita' }).click();
 
-  // The rest gets baked and called: the customer screen says the rest was handed over already.
-  await tab(page, 'Kitchen').click();
-  for (let n = 2; n > 0; n--) {
-    await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
-    await expect(page.locator('.kitchen-order .pizzas li')).toHaveCount(n - 1);
-  }
-  await tab(page, 'Oven').click();
-  for (let n = 2; n > 0; n--) {
-    await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Baked', exact: true }).click();
-    await expect(page.locator('.kitchen-order .pizzas li')).toHaveCount(n - 1);
-  }
-  await tab(page, 'Counter').click();
-  await fromKitchen.locator('app-order-card', { hasText: '#1' }).getByRole('button', { name: 'Ready for customer' }).click();
+  // The rest is baked: since part went ahead, it can still go pizza by pizza or all at once.
+  await bake(page, 2);
+  await expect(card.locator('.counter-pizzas li')).toHaveText([/Funghi.*To customer screen/, /Hawaii.*To customer screen/]);
+  await expect(card.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Ready for customer' }).click();
+  await expect(fromKitchen.locator('app-order-card', { hasText: '#1' })).toHaveCount(0);
   await expect(block('Ready! Please collect')).toHaveText([/1× Funghi, 1× Hawaii\s*The rest was already handed over/]);
-  const called = page.locator('.column', { hasText: 'On the customer screen' }).locator('app-order-card', { hasText: '#1' });
-  await expect(called.locator('.counter-pizzas li').first()).toContainText('Handed over');
-  // Handing over the last pizzas finishes the order.
-  await called.getByRole('button', { name: 'Hand over Funghi' }).click();
-  await called.getByRole('button', { name: 'Hand over Hawaii' }).click();
+  // The whole order is on the screen now: no buttons per pizza, just Picked up.
+  await expect(shown.locator('.counter-pizzas li')).toHaveText([/Margherita.*Handed over/, /Funghi/, /Hawaii/]);
+  await expect(shown.getByRole('button', { name: /Hand over/ })).toHaveCount(0);
+  await shown.getByRole('button', { name: 'Picked up' }).click();
   await expect(page.locator('app-order-card', { hasText: '#1' })).toHaveCount(0);
   await expect(block('Ready! Please collect')).toHaveCount(0);
+});
+
+test('a big order baked all at once needs no buttons per pizza at the counter', async ({ page }) => {
+  await bigOrder(page);
+  await bake(page, 3);
+  const card = column(page, 'From the kitchen').locator('app-order-card', { hasText: '#1' });
+  await expect(card.locator('.counter-pizzas li')).toHaveText([/Margherita/, /Funghi/, /Hawaii/]);
+  await expect(card.getByRole('button', { name: /customer screen/ })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Ready for customer' }).click();
+  const shown = column(page, 'On the customer screen').locator('app-order-card', { hasText: '#1' });
+  await expect(shown.locator('.counter-pizzas li')).toHaveCount(3);
+  await expect(shown.getByRole('button', { name: /Hand over/ })).toHaveCount(0);
+  await expect(shown.getByRole('button', { name: 'Picked up' })).toBeVisible();
 });
