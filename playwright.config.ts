@@ -9,6 +9,8 @@ export default defineConfig({
   reporter: process.env['CI'] ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4321/',
+    // A stuck tap fails on its own line (with the reason) instead of only timing out the test.
+    actionTimeout: 10_000,
     launchOptions: { executablePath: process.env['CHROMIUM_PATH'] || undefined },
   },
   projects: [

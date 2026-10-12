@@ -51,6 +51,8 @@ test('prices: a general price, a price per pizza, and totals for order taker and
   // in the background barely updates.)
   await page.bringToFront();
   await tab(page, 'Settings').click();
+  // Settings show the queue's own values once ready to edit.
+  await expect(page.getByLabel('Price per pizza')).toHaveValue('9.5');
   await page.getByLabel('Price per pizza').fill('10');
   await page.getByRole('button', { name: 'Save settings' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
