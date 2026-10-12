@@ -1,6 +1,5 @@
-import { Component, computed, effect, inject, input, untracked } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
 import { renderSVG } from 'uqr';
 import { OrderDraft, QueueService } from '../queue.service';
 import { formatPrice, orderTotal, priceOf } from '../models';
@@ -25,7 +24,7 @@ import { Unlock } from './unlock';
 import { SponsorBanner } from './sponsor-banner';
 @Component({
   selector: 'app-order-screen',
-  imports: [Unlock, RouterLink, T, SponsorBanner],
+  imports: [Unlock, T, SponsorBanner],
   template: `
     @if (queue.lock() !== 'open') {
       <app-unlock />
@@ -135,8 +134,11 @@ import { SponsorBanner } from './sponsor-banner';
         @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
           <span class="pill offline">{{ 'Offline' | t }}</span>
         }
-        <button type="button" (click)="fullscreen()">{{ 'Full screen' | t }}</button>
-        <a routerLink="../take">{{ 'Back' | t }}</a>
+        <!-- Customers stand at this screen: nothing to tap once it's full screen, no way back
+             to the staff pages. Staff leave full screen with Esc and close the window. -->
+        @if (!isFullscreen()) {
+          <button type="button" (click)="fullscreen()">{{ 'Full screen' | t }}</button>
+        }
       </footer>
     </main>
     }
@@ -249,6 +251,9 @@ export class OrderScreen {
   }
 
   constructor() {
+    const onChange = () => this.isFullscreen.set(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    inject(DestroyRef).onDestroy(() => document.removeEventListener('fullscreenchange', onChange));
     // Customers read this screen: it speaks the queue's language.
     speakToCustomers(() => this.queue.state()?.lang);
     effect(() => {
@@ -274,9 +279,11 @@ export class OrderScreen {
     return around(text, '{n}');
   }
 
+  protected isFullscreen = signal(!!document.fullscreenElement);
+
+  /** Only into full screen: a customer tapping twice mustn't take it out. */
   fullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.().catch(() => {});
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
   }
 }
 

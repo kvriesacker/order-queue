@@ -23,6 +23,16 @@ test('the customer screen follows the order as it is taken', async ({ page, cont
   await screen.waitForLoadState();
   await expect(screen.getByText('Next customer')).toBeVisible();
   await expect(screen.locator('.qr svg')).toHaveCount(0);
+  // Nothing for a customer to tap: no way back to the staff pages, and once full screen,
+  // no buttons at all (a double tap doesn't leave full screen either).
+  await expect(screen.getByRole('link')).toHaveCount(0);
+  await expect(screen.getByRole('button')).toHaveText(['Full screen']);
+  await screen.getByRole('button', { name: 'Full screen' }).click();
+  await expect.poll(() => screen.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await expect(screen.getByRole('button')).toHaveCount(0);
+  await screen.locator('.order-screen').dblclick();
+  await screen.waitForTimeout(300);
+  expect(await screen.evaluate(() => !!document.fullscreenElement)).toBe(true);
 
   // While the order is taken, the customer sees it and can already scan the QR code.
   await page.locator('.menu-item', { hasText: 'Margherita' }).click();
