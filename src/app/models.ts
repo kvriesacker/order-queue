@@ -512,28 +512,62 @@ export function kitchenStatus(items: OrderItem[]): OrderStatus {
   return 'in-progress';
 }
 
-/** The block an order shows in on the customer screen. */
-export type DisplayStage = 'ordered' | 'preparing' | 'baking' | 'ready';
+/** The block a pizza shows in on the customer screen, in order. */
+export type DisplayStage = 'ordered' | 'preparing' | 'baking' | 'baked' | 'ready';
+export const DISPLAY_STAGES: DisplayStage[] = ['ordered', 'preparing', 'baking', 'baked', 'ready'];
 
-/**
- * An order moves to the next block as soon as its first pizza does: "Being prepared" once the
- * kitchen has prepared one pizza, "Baking" once all are prepared, one is in the oven or one is baked,
- * and "Ready" once the counter calls it. Finished and cancelled orders show nowhere.
- */
+/** What each block is called, on the customer screen and wherever staff see a pizza's step. */
+export const STAGE_LABELS: Record<DisplayStage, string> = {
+  ordered: 'Ordered',
+  preparing: 'Being prepared',
+  baking: 'In the oven',
+  baked: 'Baked',
+  ready: 'Ready',
+};
+
 /** Whether one pizza is on the customer screen: called on its own, with its order, or given. */
 export function pizzaCalled(order: Order, item: number, unit: number): boolean {
   const times = order.items[item]?.times[unit];
   return order.status === 'ready-for-customer' || !!times?.called || !!times?.handed;
 }
 
-export function displayStage(order: Order): DisplayStage | null {
-  if (order.status === 'ready-for-customer') return 'ready';
+/**
+ * The block one pizza is in: "Being prepared" once the kitchen started on its order (so it is
+ * being topped, or waits for the oven), "In the oven" only once it's put in an oven, "Baked"
+ * until the counter calls it, then "Ready". Finished and cancelled orders show nowhere.
+ */
+export function pizzaStage(order: Order, item: number, unit: number): DisplayStage | null {
   if (order.status === 'collected' || order.status === 'cancelled') return null;
-  const units = order.items.flatMap((i) => i.units);
-  const anyInOven = order.items.some((i) => i.units.some((u, j) => inOven(u, i.times[j])));
-  if (anyInOven || units.some((u) => u === 'baked') || units.every((u) => u !== 'new')) return 'baking';
-  if (units.some((u) => u === 'prepared')) return 'preparing';
-  return 'ordered';
+  if (pizzaCalled(order, item, unit)) return 'ready';
+  const status = order.items[item]?.units[unit];
+  const times = order.items[item]?.times[unit];
+  if (status === 'baked') return 'baked';
+  if (inOven(status, times)) return 'baking';
+  if (status === 'prepared') return 'preparing';
+  return order.items.some((i) => i.units.some((u) => u !== 'new')) ? 'preparing' : 'ordered';
+}
+
+/** How many of an order's pizzas are in each block. */
+export function stageCounts(order: Order): Partial<Record<DisplayStage, number>> {
+  const counts: Partial<Record<DisplayStage, number>> = {};
+  order.items.forEach((item, i) =>
+    item.units.forEach((_, u) => {
+      const stage = pizzaStage(order, i, u);
+      if (stage) counts[stage] = (counts[stage] ?? 0) + 1;
+    }),
+  );
+  return counts;
+}
+
+/**
+ * The furthest block an order's pizzas not yet on the customer screen reached, or "Ready" once
+ * they all are. Finished and cancelled orders show nowhere.
+ */
+export function displayStage(order: Order): DisplayStage | null {
+  if (order.status === 'collected' || order.status === 'cancelled') return null;
+  const counts = stageCounts(order);
+  const open = DISPLAY_STAGES.filter((s) => s !== 'ready' && counts[s]);
+  return open.length ? open[open.length - 1] : 'ready';
 }
 
 /** A valid per-type maximum: a whole number, 0 meaning no limit. */

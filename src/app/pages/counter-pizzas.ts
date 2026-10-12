@@ -1,14 +1,8 @@
 import { Component, computed, inject, input } from '@angular/core';
-import { Order, PizzaStatus, pizzaCalled, textOn } from '../models';
+import { Order, STAGE_LABELS, pizzaCalled, pizzaStage, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { T } from '../i18n/i18n';
 import { byType } from './station';
-
-const STEP: Record<PizzaStatus, string> = {
-  new: 'In the kitchen',
-  prepared: 'In the oven',
-  baked: 'Baked',
-};
 
 /** Part of a big order is on the customer screen (or given), the rest isn't yet. */
 export function partlyCalled(order: Order): boolean {
@@ -68,7 +62,7 @@ export function waitingAtCounter(order: Order): boolean {
                 {{ 'To customer screen' | t }}
               </button>
             } @else {
-              <span class="muted">{{ step[p.status] | t }}</span>
+              <span class="muted">{{ step[p.stage ?? 'ordered'] | t }}</span>
             }
           </span>
         </li>
@@ -82,7 +76,7 @@ export class CounterPizzas {
   /** Which column: pizzas still to put on the customer screen, or the ones on it. */
   readonly mode = input<'kitchen' | 'screen'>('kitchen');
   protected textOn = textOn;
-  protected step = STEP;
+  protected step = STAGE_LABELS;
 
   /**
    * Buttons per pizza: only while the order is split, or could be (a big order not fully
@@ -108,6 +102,7 @@ export class CounterPizzas {
           note: item.note,
           color: item.color,
           status,
+          stage: pizzaStage(order, i, u),
           called: pizzaCalled(order, i, u),
           handed: !!item.times[u]?.handed,
         })),

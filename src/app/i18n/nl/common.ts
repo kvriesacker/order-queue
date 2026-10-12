@@ -79,5 +79,5 @@ export const NL_COMMON: Record<string, string> = {
   // Customer display: a big order partly ready
   'Part of the order, the rest follows': 'Deel van de bestelling, de rest volgt',
   'The rest was already handed over': 'De rest is al meegegeven',
-  'Rest of the order': 'Rest van de bestelling',
+  'Part of the order': 'Deel van de bestelling',
 };

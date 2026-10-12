@@ -1,5 +1,5 @@
 import { Component, computed, inject, input } from '@angular/core';
-import { Order, STATUS_LABELS } from '../models';
+import { DISPLAY_STAGES, Order, STAGE_LABELS, STATUS_LABELS, stageCounts } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { T, dateLocale, t } from '../i18n/i18n';
@@ -37,7 +37,7 @@ import { T, dateLocale, t } from '../i18n/i18n';
         <p class="order-note">{{ order().note }}</p>
       }
       @if (showStatus()) {
-        <p class="status-label">{{ labels[order().status] | t }}</p>
+        <p class="status-label">{{ status() }}</p>
       }
       <div class="actions"><ng-content /></div>
     </article>
@@ -49,7 +49,19 @@ export class OrderCard {
   readonly showStatus = input(false);
   /** Off where the page lists the pizzas itself (the counter, pizza by pizza). */
   readonly showItems = input(true);
-  protected labels = STATUS_LABELS;
+
+  /**
+   * Where the order's pizzas are, step by step ("In the oven", or "Being prepared (1) · In
+   * the oven (1)" while a big order is split); done and cancelled orders say so.
+   */
+  protected status = computed(() => {
+    const order = this.order();
+    if (!['new', 'in-progress', 'ready'].includes(order.status)) return t(STATUS_LABELS[order.status]);
+    const counts = stageCounts(order);
+    const stages = DISPLAY_STAGES.filter((s) => counts[s]);
+    if (stages.length === 1) return t(STAGE_LABELS[stages[0]]);
+    return stages.map((s) => `${t(STAGE_LABELS[s])} (${counts[s]})`).join(' · ');
+  });
 
   protected time = computed(() =>
     new Date(this.order().createdAt).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' }),

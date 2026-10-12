@@ -242,6 +242,9 @@ test("the order is saved for the customer's follow app as the stations work on i
   await expect.poll(() => savedTrack(orderId), { timeout: 20_000 }).toMatchObject({ customer: 'Anna', number: 1 });
   await markAll(kitchen, 1, 'Prepared');
   await markAll(oven, 1, 'Baked');
+  await expect
+    .poll(() => savedTrack(orderId), { timeout: 20_000 })
+    .toMatchObject({ status: 'ready', stage: 'baked', stages: { baked: 1 } });
   await first.getByRole('navigation').getByRole('link', { name: 'Counter' }).click();
   await first
     .locator('app-order-card', { hasText: '#1' })
@@ -249,5 +252,5 @@ test("the order is saved for the customer's follow app as the stations work on i
     .click();
   await expect
     .poll(() => savedTrack(orderId), { timeout: 20_000 })
-    .toMatchObject({ status: 'ready-for-customer', stage: 'ready' });
+    .toMatchObject({ status: 'ready-for-customer', stage: 'ready', stages: { ready: 1 } });
 });

@@ -1,4 +1,4 @@
-import { DisplayStage, Order, OrderStatus, QueueState, displayStage } from './models';
+import { DisplayStage, Order, OrderStatus, QueueState, displayStage, stageCounts } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
@@ -14,8 +14,13 @@ export interface OrderTrack {
   customer: string;
   pizzas: string;
   status: OrderStatus;
-  /** Which block of the customer display the order is in (older versions don't send it). */
+  /**
+   * The furthest block of the customer display the order's pizzas not yet called reached
+   * (older versions don't send it).
+   */
   stage?: DisplayStage | null;
+  /** How many pizzas are in each block, as an order can be split (older versions don't send it). */
+  stages?: Partial<Record<DisplayStage, number>>;
   /** Estimated ready time, cut to the minute, as clocks show it; absent once the order is ready. */
   eta?: number;
   /** The queue's language, which the follow page speaks (older versions don't send it). */
@@ -37,6 +42,7 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     pizzas: pizzaSummary(order),
     status: order.status,
     stage: displayStage(order),
+    stages: stageCounts(order),
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
     lang: state.lang ?? 'nl',
   };

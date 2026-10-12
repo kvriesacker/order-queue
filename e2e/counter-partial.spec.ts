@@ -128,8 +128,8 @@ test('the counter can show and hand over the baked pizzas of a big order before 
   const card = fromKitchen.locator('app-order-card', { hasText: '#1' });
   await expect(card.locator('.counter-pizzas li')).toHaveText([
     /Margherita.*To customer screen/,
-    /Funghi.*In the kitchen/,
-    /Hawaii.*In the kitchen/,
+    /Funghi.*Being prepared/,
+    /Hawaii.*Being prepared/,
   ]);
   // The Margherita goes on the customer screen on its own: the order is now in both columns.
   await card.getByRole('button', { name: 'Show Margherita on the customer screen' }).click();
@@ -142,7 +142,8 @@ test('the counter can show and hand over the baked pizzas of a big order before 
   const block = (title: string) =>
     display.locator('.display-col', { has: display.getByRole('heading', { name: title }) }).locator('.prep-list li');
   await expect(block('Ready! Please collect')).toHaveText([/1\s*Anna\s*1× Margherita\s*Part of the order, the rest follows/]);
-  await expect(block('Ordered')).toHaveText([/1\s*Anna\s*1× Funghi, 1× Hawaii\s*Rest of the order/]);
+  await expect(block('Being prepared')).toHaveText([/1\s*Anna\s*1× Funghi, 1× Hawaii\s*Part of the order/]);
+  await expect(block('Ordered')).toHaveText(['No new orders.']);
 
   // Handed over: it leaves the Ready block. A mistake can be undone.
   await shown.getByRole('button', { name: 'Hand over Margherita' }).click();

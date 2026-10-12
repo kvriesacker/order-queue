@@ -1,5 +1,6 @@
 import {
   Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks, ovenLoad,
+  pizzaStage, stageCounts,
   cleanPrice, formatPrice, kitchenLeft, leftChange, orderTotal, pizzasLeft, priceOf, typeLeft, typeMade,
   typeSold,
 } from './models';
@@ -379,10 +380,27 @@ describe('displayStage', () => {
   it('moves an order on as soon as its first pizza moves', () => {
     expect(displayStage(order(['new', 'new'], 'new'))).toBe('ordered');
     expect(displayStage(order(['prepared', 'new']))).toBe('preparing');
-    expect(displayStage(order(['prepared', 'prepared']))).toBe('baking');
-    expect(displayStage(order(['baked', 'new']))).toBe('baking');
-    expect(displayStage(order(['baked', 'baked'], 'ready'))).toBe('baking');
+    // Prepared pizzas wait for the oven: "In the oven" only once one is put in.
+    expect(displayStage(order(['prepared', 'prepared']))).toBe('preparing');
+    const oven = order(['prepared', 'prepared']);
+    oven.items[0].times = [{ prepared: 1, inOven: 2, oven: 0 }, { prepared: 1 }];
+    expect(displayStage(oven)).toBe('baking');
+    expect(displayStage(order(['baked', 'new']))).toBe('baked');
+    expect(displayStage(order(['baked', 'baked'], 'ready'))).toBe('baked');
     expect(displayStage(order(['baked'], 'ready-for-customer'))).toBe('ready');
+  });
+
+  it('puts each pizza in its own block', () => {
+    const o = order(['new', 'prepared', 'prepared', 'baked', 'baked']);
+    o.items[0].times = [{}, { prepared: 1 }, { prepared: 1, inOven: 2, oven: 0 }, { prepared: 1, baked: 3 }, { prepared: 1, baked: 3, called: 4 }];
+    expect([0, 1, 2, 3, 4].map((u) => pizzaStage(o, 0, u))).toEqual(['preparing', 'preparing', 'baking', 'baked', 'ready']);
+    expect(stageCounts(o)).toEqual({ preparing: 2, baking: 1, baked: 1, ready: 1 });
+    // Nothing started yet: every pizza is just ordered.
+    expect(pizzaStage(order(['new', 'new'], 'new'), 0, 1)).toBe('ordered');
+    // Everything called but not yet given: the order is ready.
+    const called = order(['baked'], 'ready');
+    called.items[0].times = [{ baked: 1, called: 2 }];
+    expect(displayStage(called)).toBe('ready');
   });
 
   it('hides picked-up and cancelled orders', () => {
