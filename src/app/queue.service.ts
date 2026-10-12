@@ -423,6 +423,11 @@ export class QueueService {
     this.dispatch({ type: 'oven', index, out });
   }
 
+  /** Puts one prepared pizza in an oven (0 is the first), or with null takes it back out. */
+  putInOven(order: Order, item: number, unit: number, oven: number | null): void {
+    this.dispatch({ type: 'bake', id: order.id, item, unit, oven });
+  }
+
   setPizza(order: Order, item: number, unit: number, status: PizzaStatus): void {
     this.dispatch({ type: 'pizza', id: order.id, item, unit, status });
   }

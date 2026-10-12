@@ -34,6 +34,9 @@ export interface OrderItem {
 
 export interface PizzaTimes {
   prepared?: number;
+  /** When the oven station put this pizza in an oven, and which one (0 is the first). */
+  inOven?: number;
+  oven?: number;
   baked?: number;
   /** When the counter put this pizza on the customer screen, before the rest of a big order. */
   called?: number;
@@ -237,6 +240,8 @@ export type QueueAction =
   | { type: 'hand'; id: string; item: number; unit: number; handed: boolean }
   /** The oven station marks one oven out of order, or working again. */
   | { type: 'oven'; index: number; out: boolean }
+  /** The oven station puts one prepared pizza in an oven (or, with null, takes it back out). */
+  | { type: 'bake'; id: string; item: number; unit: number; oven: number | null }
   /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
   | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean };
 
@@ -340,6 +345,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
       // A pizza on the customer screen or already given can't go back to the kitchen or oven.
       const was = target.items[action.item].times[action.unit];
       if (was?.handed || was?.called) return state;
+      // Nor can a pizza in the oven go back to the kitchen.
+      if (action.status === 'new' && was?.inOven) return state;
       if (!PIZZA_STATUSES.includes(action.status)) return state;
       return updateOrder(state, action.id, (o) => {
         const items = o.items.map((item, i) =>
@@ -453,6 +460,37 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         : state.ovensOut.filter((i) => i !== index);
       return { ...state, ovensOut };
     }
+    case 'bake': {
+      const target = state.orders.find((o) => o.id === action.id);
+      const unit = target?.items[action.item]?.units[action.unit];
+      if (!target || unit !== 'prepared') return state;
+      if (!['new', 'in-progress'].includes(target.status)) return state;
+      const times = target.items[action.item].times[action.unit] ?? {};
+      const oven = action.oven;
+      if (oven === null) {
+        if (times.inOven === undefined) return state;
+      } else {
+        // Only into a working oven with room, and only once.
+        if (times.inOven !== undefined || !Number.isInteger(oven)) return state;
+        if (oven < 0 || oven >= state.timing.ovens || state.ovensOut.includes(oven)) return state;
+        if (ovenLoad(state)[oven] >= state.timing.pizzasPerOven) return state;
+      }
+      return updateOrder(state, action.id, (o) => {
+        const items: OrderItem[] = o.items.map((item, i) =>
+          i !== action.item
+            ? item
+            : {
+                ...item,
+                times: item.times.map((t, j): PizzaTimes => {
+                  if (j !== action.unit) return t;
+                  const { inOven: _, oven: __, ...rest } = t;
+                  return oven === null ? rest : { ...rest, inOven: now, oven };
+                }),
+              },
+        );
+        return { ...o, items, updatedAt: now };
+      });
+    }
     case 'type-limit': {
       const index = state.menu.findIndex((m) => m.name === action.name);
       if (index < 0) return state;
@@ -479,7 +517,7 @@ export type DisplayStage = 'ordered' | 'preparing' | 'baking' | 'ready';
 
 /**
  * An order moves to the next block as soon as its first pizza does: "Being prepared" once the
- * kitchen has prepared one pizza, "Baking" once all are prepared (in the oven) or one is baked,
+ * kitchen has prepared one pizza, "Baking" once all are prepared, one is in the oven or one is baked,
  * and "Ready" once the counter calls it. Finished and cancelled orders show nowhere.
  */
 /** Whether one pizza is on the customer screen: called on its own, with its order, or given. */
@@ -492,7 +530,8 @@ export function displayStage(order: Order): DisplayStage | null {
   if (order.status === 'ready-for-customer') return 'ready';
   if (order.status === 'collected' || order.status === 'cancelled') return null;
   const units = order.items.flatMap((i) => i.units);
-  if (units.some((u) => u === 'baked') || units.every((u) => u !== 'new')) return 'baking';
+  const anyInOven = order.items.some((i) => i.units.some((u, j) => inOven(u, i.times[j])));
+  if (anyInOven || units.some((u) => u === 'baked') || units.every((u) => u !== 'new')) return 'baking';
   if (units.some((u) => u === 'prepared')) return 'preparing';
   return 'ordered';
 }
@@ -502,11 +541,36 @@ function typeMax(n: unknown): number {
   return typeof n === 'number' && n > 0 && n <= MAX_PIZZAS ? Math.floor(n) : 0;
 }
 
-/** Records when a pizza reached a step; going back clears the later steps. */
+/**
+ * Records when a pizza reached a step; going back clears the later steps. A baked pizza taken
+ * back (Undo) is in its oven again.
+ */
 function stampTimes(times: PizzaTimes, status: PizzaStatus, now: number): PizzaTimes {
   if (status === 'new') return {};
-  if (status === 'prepared') return { prepared: times.prepared ?? now };
-  return { prepared: times.prepared, baked: now };
+  const { inOven, oven } = times;
+  const ovenTimes = inOven === undefined ? {} : { inOven, oven };
+  if (status === 'prepared') return { prepared: times.prepared ?? now, ...ovenTimes };
+  return { prepared: times.prepared, ...ovenTimes, baked: now };
+}
+
+/** Whether a pizza is in an oven right now: put in, not baked yet. */
+export function inOven(unit: PizzaStatus, times: PizzaTimes | undefined): boolean {
+  return unit === 'prepared' && times?.inOven !== undefined;
+}
+
+/** How many pizzas are in each oven right now (index 0 is the first oven). */
+export function ovenLoad(state: QueueState): number[] {
+  const load = Array<number>(state.timing.ovens).fill(0);
+  for (const order of state.orders) {
+    if (order.status !== 'new' && order.status !== 'in-progress') continue;
+    for (const item of order.items) {
+      item.units.forEach((unit, j) => {
+        const oven = item.times[j]?.oven;
+        if (inOven(unit, item.times[j]) && oven !== undefined && oven < load.length) load[oven]++;
+      });
+    }
+  }
+  return load;
 }
 
 /** What every pizza becomes when a whole order is moved back (an undo at the counter). */

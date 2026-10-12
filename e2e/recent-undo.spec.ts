@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PASSWORD } from './password';
+import { putInOven } from './oven';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -38,6 +39,7 @@ test('kitchen and oven see what they just marked and can undo it', async ({ page
 
   // Oven: once baked the order goes to the counter, and "Just baked" can still undo it.
   await tab(page, 'Oven').click();
+  await putInOven(page.locator('.kitchen-order'));
   await page.locator('.kitchen-order').getByRole('button', { name: 'Baked', exact: true }).click();
   await expect(page.locator('.kitchen-order')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Just baked' })).toBeVisible();
@@ -48,6 +50,7 @@ test('kitchen and oven see what they just marked and can undo it', async ({ page
   await tab(page, 'Oven').click();
   await page.getByRole('button', { name: 'Undo Margherita of order 1' }).click();
   await expect(page.locator('.kitchen-order')).toHaveCount(1);
+  // Taken back, it's in its oven again.
   await expect(page.locator('.kitchen-order').getByRole('button', { name: 'Baked', exact: true })).toBeVisible();
 
   // The kitchen no longer lists a pizza the oven has baked, so it can't undo past the oven.

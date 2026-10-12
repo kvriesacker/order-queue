@@ -1,5 +1,5 @@
 import { dateLocale, t } from './i18n/i18n';
-import { NewOrderItem, Order, QueueState, Timing, applyAction } from './models';
+import { NewOrderItem, Order, QueueState, Timing, applyAction, inOven } from './models';
 
 const MINUTE = 60000;
 /** Only the last hour counts when measuring how fast things go. */
@@ -33,14 +33,15 @@ export function phaseTimes(state: QueueState, now: number): PhaseTimes {
     .sort((a, b) => a - b);
   const prepareGaps = prepared.slice(1).map((t, i) => t - prepared[i]);
 
-  // Oven: from prepared to baked, per pizza. A pizza that had to wait for room in a full
-  // oven doesn't tell how long baking takes, so it's left out.
+  // Oven: from going in to coming out, per pizza. Pizzas from before the oven marked them
+  // going in count from prepared, unless they had to wait for room in a full oven (that
+  // doesn't tell how long baking takes).
   const slots = ovenSlots(state);
   const inOvenAt = (at: number) =>
     pizzas.filter((t) => t.prepared && t.prepared < at && (!t.baked || t.baked > at)).length;
   const bakeTimes = pizzas
-    .filter((t) => recent(t.baked) && t.prepared && inOvenAt(t.prepared) < slots)
-    .map((t) => t.baked! - t.prepared!);
+    .filter((t) => recent(t.baked) && (t.inOven || (t.prepared && inOvenAt(t.prepared) < slots)))
+    .map((t) => t.baked! - (t.inOven ?? t.prepared!));
 
   // Counter: from the order's last pizza baked to the customer being called.
   const counterTimes = state.orders
@@ -107,6 +108,8 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
   // When each order's pizzas are baked, and which pizzas still need the oven.
   const lastBaked = new Map<string, number>();
   const forOven: { order: string; from: number }[] = [];
+  /** When each pizza in an oven right now comes out. */
+  const baking: number[] = [];
   for (const order of open) {
     lastBaked.set(order.id, order.status === 'ready' ? (order.bakedAt ?? now) : 0);
     if (order.status === 'ready') continue;
@@ -115,6 +118,10 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
         const times = item.times[j] ?? {};
         if (unit === 'baked') {
           lastBaked.set(order.id, Math.max(lastBaked.get(order.id)!, times.baked ?? now));
+        } else if (inOven(unit, times)) {
+          const out = Math.max(now, times.inOven! + bake);
+          baking.push(out);
+          lastBaked.set(order.id, Math.max(lastBaked.get(order.id)!, out));
         } else if (unit === 'prepared') {
           forOven.push({ order: order.id, from: times.prepared ?? now });
         } else {
@@ -127,7 +134,9 @@ export function estimateReady(state: QueueState, now: number): Map<string, numbe
 
   // Fill the oven spots in the order pizzas come out of the kitchen. With every oven out of
   // order, orders that still need the oven have no estimate until one works again.
+  // Pizzas in the ovens hold their spot until they come out.
   const free = Array<number>(ovenSlots(state)).fill(0);
+  baking.sort((a, b) => a - b).forEach((out, i) => i < free.length && (free[i] = out));
   if (!free.length) for (const pizza of forOven) lastBaked.delete(pizza.order);
   for (const pizza of free.length ? forOven.sort((a, b) => a.from - b.from) : []) {
     const spot = free.indexOf(Math.min(...free));

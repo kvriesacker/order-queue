@@ -34,6 +34,10 @@ export const NL_STATIONS: Record<string, string> = {
     "Typ hoeveel je er nog kunt maken, inclusief de bestelde pizza's die je nog niet belegd hebt. Laat leeg voor geen limiet.",
   // Ovens (ovens.ts)
   'Oven {n}': 'Oven {n}',
+  'In oven {n}': 'In oven {n}',
+  'Every oven is out of order': 'Alle ovens zijn buiten gebruik',
+  '{time} left': 'Nog {time}',
+  'Done {time} ago': 'Klaar sinds {time}',
   'Out of order': 'Defect',
   'Working again': 'Werkt weer',
   'Mark out of order': 'Als defect melden',

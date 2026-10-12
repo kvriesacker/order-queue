@@ -1,5 +1,5 @@
 import {
-  Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks,
+  Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks, ovenLoad,
   cleanPrice, formatPrice, kitchenLeft, leftChange, orderTotal, pizzasLeft, priceOf, typeLeft, typeMade,
   typeSold,
 } from './models';
@@ -88,6 +88,53 @@ describe('applyAction', () => {
     // Once the customer has every pizza, the order is picked up.
     s = applyAction(applyAction(s, hand(1)), hand(2));
     expect(s.orders[0].status).toBe('collected');
+  });
+
+  it('puts prepared pizzas in an oven only while it has room, and baking frees the spot', () => {
+    let s: QueueState = { ...empty, timing: { ...empty.timing, ovens: 2, pizzasPerOven: 1 } };
+    s = applyAction(s, { ...add('a'), items: [{ name: 'Margherita', qty: 3, note: '', color: '#e53935' }] });
+    const pizza = (unit: number, status: PizzaStatus): QueueAction => ({ type: 'pizza', id: 'a', item: 0, unit, status });
+    const bake = (unit: number, oven: number | null): QueueAction => ({ type: 'bake', id: 'a', item: 0, unit, oven });
+    const times = () => s.orders[0].items[0].times;
+    // Not before the kitchen has prepared it.
+    expect(applyAction(s, bake(0, 0))).toBe(s);
+    for (const u of [0, 1, 2]) s = applyAction(s, pizza(u, 'prepared'));
+    s = applyAction(s, bake(0, 0), 1000);
+    expect(times()[0]).toMatchObject({ inOven: 1000, oven: 0 });
+    expect(ovenLoad(s)).toEqual([1, 0]);
+    expect(displayStage(s.orders[0])).toBe('baking');
+    // Oven 1 is full; oven 2 has room; nothing goes in twice or into a missing oven.
+    expect(applyAction(s, bake(1, 0))).toBe(s);
+    expect(applyAction(s, bake(0, 1))).toBe(s);
+    expect(applyAction(s, bake(1, 2))).toBe(s);
+    s = applyAction(s, bake(1, 1));
+    expect(ovenLoad(s)).toEqual([1, 1]);
+    // In the oven, a pizza can't go back to the kitchen.
+    expect(applyAction(s, pizza(0, 'new'))).toBe(s);
+    // Baked: the spot is free again, and the times are kept for the statistics.
+    s = applyAction(s, pizza(0, 'baked'), 9000);
+    expect(ovenLoad(s)).toEqual([0, 1]);
+    expect(times()[0]).toMatchObject({ inOven: 1000, oven: 0, baked: 9000 });
+    s = applyAction(s, bake(2, 0));
+    expect(ovenLoad(s)).toEqual([1, 1]);
+    // Taken back out (a mistake), it waits for the oven again.
+    s = applyAction(s, bake(2, null));
+    expect(times()[2].inOven).toBeUndefined();
+    expect(ovenLoad(s)).toEqual([0, 1]);
+    // An oven out of order takes no pizzas.
+    s = applyAction(s, { type: 'oven', index: 0, out: true });
+    expect(applyAction(s, bake(2, 0))).toBe(s);
+  });
+
+  it('puts a baked pizza that is taken back (Undo) in its oven again', () => {
+    let s = applyAction(empty, add('a'));
+    s = applyAction(s, { type: 'pizza', id: 'a', item: 0, unit: 0, status: 'prepared' });
+    s = applyAction(s, { type: 'bake', id: 'a', item: 0, unit: 0, oven: 0 }, 1000);
+    s = applyAction(s, { type: 'pizza', id: 'a', item: 0, unit: 0, status: 'baked' }, 9000);
+    s = applyAction(s, { type: 'pizza', id: 'a', item: 0, unit: 0, status: 'prepared' });
+    expect(s.orders[0].items[0].times[0]).toMatchObject({ inOven: 1000, oven: 0 });
+    expect(s.orders[0].items[0].times[0].baked).toBeUndefined();
+    expect(ovenLoad(s)).toEqual([1]);
   });
 
   it('keeps the language for joining devices and customer screens; old queues speak Dutch', () => {

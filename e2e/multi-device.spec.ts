@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { ENGLISH } from '../playwright.config';
 import { savedTrack } from './track-doc';
 import { PASSWORD } from './password';
+import { putInOven } from './oven';
 
 // Several devices (each its own browser, as on separate phones and tablets) working on one
 // queue through the local Firebase emulator started by the Playwright config.
@@ -61,6 +62,7 @@ function stationOrder(page: Page, number: number) {
 
 async function markAll(page: Page, number: number, button: 'Prepared' | 'Baked', online = true) {
   const card = stationOrder(page, number);
+  if (button === 'Baked') await putInOven(card);
   const buttons = card.getByRole('button', { name: button, exact: true });
   await expect(buttons.first()).toBeVisible({ timeout: 20_000 });
   for (let n = await buttons.count(); n > 0; n--) {

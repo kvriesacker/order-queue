@@ -124,6 +124,32 @@ describe('estimateReady', () => {
     expect(phaseTimes(s, T0 + 16 * MIN).bake).toBe(8 * MIN);
   });
 
+  it('counts pizzas in the oven from when they went in, holding their spot', () => {
+    let s: QueueState = { ...queue(), timing: { ...queue().timing, pizzasPerOven: 1 } };
+    s = order(s, 'a', 1, T0);
+    s = order(s, 'b', 1, T0);
+    s = pizza(s, 'a', 0, 'prepared', T0);
+    s = pizza(s, 'b', 0, 'prepared', T0);
+    // b went into the only spot 2 minutes ago: out at 6 min, then a bakes until 14.
+    s = applyAction(s, { type: 'bake', id: 'b', item: 0, unit: 0, oven: 0 }, T0 - 2 * MIN);
+    const eta = estimateReady(s, T0);
+    expect(eta.get('b')).toBe(T0 + 8 * MIN);
+    expect(eta.get('a')).toBe(T0 + 16 * MIN);
+  });
+
+  it('learns the bake time from going in to coming out', () => {
+    let s = queue();
+    for (let i = 0; i < 5; i++) {
+      const id = `o${i}`;
+      s = order(s, id, 1, T0);
+      s = pizza(s, id, 0, 'prepared', T0);
+      s = applyAction(s, { type: 'bake', id, item: 0, unit: 0, oven: 0 }, T0 + 10 * MIN);
+      s = pizza(s, id, 0, 'baked', T0 + 16 * MIN);
+    }
+    // Prepared long before, but only 6 minutes in the oven.
+    expect(phaseTimes(s, T0 + 20 * MIN).bake).toBe(6 * MIN);
+  });
+
   it('moves estimates later when an order is running late', () => {
     const s = order(queue(), 'a', 1, T0);
     const late = T0 + 30 * MIN;

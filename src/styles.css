@@ -1969,3 +1969,52 @@ app-install {
 .share-password {
   font-size: 0.9rem;
 }
+
+/* Oven: into an oven first (one button per oven), then a bake timer and Baked */
+.pizza-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.oven-in:disabled {
+  background: #f3ebe1;
+  border-color: var(--line);
+  color: var(--muted);
+  opacity: 1;
+}
+.pizzas li.in-oven {
+  background: #fff1d9;
+}
+.bake-timer {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #8a5a10;
+  line-height: 1.1;
+}
+.bake-timer small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bake-timer.done {
+  color: var(--tomato);
+  animation: bake-done 1s ease-in-out infinite alternate;
+}
+@keyframes bake-done {
+  to {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bake-timer.done {
+    animation: none;
+  }
+}
+.kitchen.focus .bake-timer {
+  font-size: 1.4rem;
+}
+.recent-oven {
+  font-size: 0.8rem;
+}

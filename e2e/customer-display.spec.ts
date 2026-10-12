@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PASSWORD } from './password';
+import { putInOven } from './oven';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -21,6 +22,7 @@ async function order(page: Page, customer: string, pizzas: string[], note?: stri
 async function station(page: Page, name: string, button: string, number: number, count?: number) {
   await tab(page, name).click();
   const card = page.locator('.kitchen-order', { hasText: `#${number}` });
+  if (button === 'Baked') await putInOven(card, count);
   const buttons = card.getByRole('button', { name: button, exact: true });
   await expect(buttons.first()).toBeVisible();
   // Wait for each click to land before the next, so a re-render never swallows one.

@@ -1,5 +1,5 @@
-import { Component, computed, inject, input } from '@angular/core';
-import { Order, PizzaStatus, textOn } from '../models';
+import { Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import { Order, PizzaStatus, PizzaTimes, inOven, ovenLoad, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { TypeLimits } from './type-limits';
@@ -16,11 +16,14 @@ interface PizzaRow {
   note: string;
   color: string;
   status: PizzaStatus;
+  times: PizzaTimes;
 }
 
 /**
- * Kitchen and oven share this page. Each station only confirms its own step once it's
- * done: the kitchen marks a pizza prepared, the oven marks it baked.
+ * Kitchen and oven share this page. The kitchen marks a pizza prepared once it's done. The
+ * oven has two steps (Koen's choice): it puts a pizza in one of its ovens (only while that
+ * oven has room), which starts a bake timer, and marks it baked when it comes out, which
+ * frees the spot.
  */
 const STATIONS = {
   kitchen: {
@@ -75,7 +78,12 @@ const STATIONS = {
               <ul class="pizzas">
                 @for (p of entry.todoPizzas; track p.item + '-' + p.unit) {
                   <!-- The whole row ticks the pizza off; the button is there to show what a tap does. -->
-                  <li [class]="rowClass(p) + ' tap-row'" (click)="set(entry.order, p, config().to)">
+                  <li
+                    [class]="rowClass(p)"
+                    [class.tap-row]="rowTap(p) !== null"
+                    [class.in-oven]="isInOven(p)"
+                    (click)="tapRow(entry.order, p)"
+                  >
                     <span class="chip" [style.background]="p.color" [style.color]="textOn(p.color)">
                       {{ p.name }}
                     </span>
@@ -85,9 +93,34 @@ const STATIONS = {
                       }
                     </span>
                     <span class="pizza-actions">
-                      <button class="btn success" type="button">
-                        {{ config().action | t }}
-                      </button>
+                      @if (station() === 'oven' && !isInOven(p)) {
+                        <!-- First into an oven (one button per working oven), then Baked. -->
+                        @for (oven of ovens(); track oven.index) {
+                          <button
+                            class="btn primary oven-in"
+                            type="button"
+                            [disabled]="oven.full"
+                            (click)="$event.stopPropagation(); putIn(entry.order, p, oven.index)"
+                          >
+                            {{ (ovens().length === 1 ? 'In the oven' : 'In oven {n}') | t: { n: oven.index + 1 } }}
+                          </button>
+                        } @empty {
+                          <span class="muted">{{ 'Every oven is out of order' | t }}</span>
+                        }
+                      } @else {
+                        @if (isInOven(p)) {
+                          @let left = bakeLeft(p);
+                          <span class="bake-timer" [class.done]="left <= 0" role="timer">
+                            @if (ovenCount() > 1) {
+                              <small>{{ 'Oven {n}' | t: { n: (p.times.oven ?? 0) + 1 } }}</small>
+                            }
+                            {{ (left > 0 ? '{time} left' : 'Done {time} ago') | t: { time: clock(left) } }}
+                          </span>
+                        }
+                        <button class="btn success" type="button">
+                          {{ config().action | t }}
+                        </button>
+                      }
                     </span>
                   </li>
                 }
@@ -115,6 +148,9 @@ const STATIONS = {
                 }}</span>
               </span>
               <span class="muted recent-age">{{ ago(r.at) }}</span>
+              @if (station() === 'kitchen' && isInOven(r)) {
+                <span class="muted recent-oven">{{ 'In the oven' | t }}</span>
+              } @else {
               <button
                 class="btn ghost small"
                 type="button"
@@ -123,6 +159,7 @@ const STATIONS = {
               >
                 {{ 'Undo' | t }}
               </button>
+              }
             </li>
           } @empty {
             <li class="muted">{{ 'Nothing yet.' | t }}</li>
@@ -229,8 +266,59 @@ export class Station {
   );
   protected baked = computed(() => this.queue.orders().filter((o) => o.status === 'ready'));
 
+  /** Ticks every second while the oven is open, for the bake timers. */
+  private tick = signal(Date.now());
+  /** The ovens that work, and whether each is full. */
+  protected ovens = computed(() => {
+    const state = this.queue.state();
+    if (!state) return [];
+    const load = ovenLoad(state);
+    return load
+      .map((n, index) => ({ index, full: n >= state.timing.pizzasPerOven }))
+      .filter((o) => !state.ovensOut.includes(o.index));
+  });
+  protected ovenCount = computed(() => this.queue.state()?.timing.ovens ?? 1);
+  protected isInOven = (p: PizzaRow) => inOven(p.status, p.times);
+
+  constructor() {
+    const timer = setInterval(() => this.station() === 'oven' && this.tick.set(Date.now()), 1000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
   set(order: Order, p: PizzaRow, status: PizzaStatus) {
     this.queue.setPizza(order, p.item, p.unit, status);
+  }
+
+  putIn(order: Order, p: PizzaRow, oven: number) {
+    this.queue.putInOven(order, p.item, p.unit, oven);
+  }
+
+  /**
+   * What tapping the row does: in the kitchen and for a pizza in the oven, the step's own
+   * button; for a pizza waiting for the oven, putting it in when there's one oven with room.
+   */
+  protected rowTap(p: PizzaRow): 'step' | number | null {
+    if (this.station() === 'kitchen' || this.isInOven(p)) return 'step';
+    const ovens = this.ovens();
+    return ovens.length === 1 && !ovens[0].full ? ovens[0].index : null;
+  }
+
+  tapRow(order: Order, p: PizzaRow) {
+    const tap = this.rowTap(p);
+    if (tap === 'step') this.set(order, p, this.config().to);
+    else if (tap !== null) this.putIn(order, p, tap);
+  }
+
+  /** Milliseconds this pizza still needs in the oven (below 0 when it's overdue). */
+  protected bakeLeft(p: PizzaRow): number {
+    const minutes = this.queue.state()?.timing.bakeMinutes ?? 0;
+    return (p.times.inOven ?? 0) + minutes * 60000 - this.tick();
+  }
+
+  /** "6:05" for a duration, either way. */
+  protected clock(ms: number): string {
+    const seconds = Math.round(Math.abs(ms) / 1000);
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   }
 
   rowClass(p: PizzaRow): string {
@@ -284,6 +372,7 @@ function pizzaRows(order: Order): PizzaRow[] {
       note: item.note,
       color: item.color,
       status,
+      times: item.times[u] ?? {},
     })),
   );
 }

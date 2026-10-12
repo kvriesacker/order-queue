@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PASSWORD } from './password';
+import { putInOven } from './oven';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -59,12 +60,16 @@ test('kitchen and oven in full screen show only what to tick off', async ({ page
   await expect(page.locator('app-type-limits')).toHaveCount(1);
 });
 
-test('the whole oven row bakes the pizza, once', async ({ page }) => {
+test('with one oven the whole oven row puts the pizza in, then bakes it, once each', async ({ page }) => {
   await bigOrder(page);
   await tab(page, 'Kitchen').click();
   await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
   await tab(page, 'Oven').click();
-  await page.locator('.kitchen-order .pizzas li', { hasText: 'Margherita' }).click({ position: { x: 5, y: 5 } });
+  const row = page.locator('.kitchen-order .pizzas li', { hasText: 'Margherita' });
+  await row.click({ position: { x: 5, y: 5 } });
+  await expect(row.getByRole('timer')).toBeVisible();
+  await expect(page.locator('.recent li')).toHaveText(['Nothing yet.']);
+  await row.click({ position: { x: 5, y: 5 } });
   await expect(page.locator('.recent li')).toHaveText([/#1\s*Margherita/]);
   // The button inside the row counts as one tap, not two.
   await tab(page, 'Kitchen').click();
@@ -98,6 +103,7 @@ async function bake(page: Page, pizzas: number) {
     const rows = page.locator('.kitchen-order .pizzas li');
     await expect(rows.first()).toBeVisible();
     const start = await rows.count();
+    if (name === 'Oven') await putInOven(page.locator('.kitchen-order'), pizzas);
     for (let n = 1; n <= pizzas; n++) {
       await rows.first().getByRole('button', { name: button, exact: true }).click();
       await expect(rows).toHaveCount(start - n);
