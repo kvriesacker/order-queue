@@ -3,19 +3,22 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { renderSVG } from 'uqr';
 import { OrderDraft, QueueService } from '../queue.service';
-import { formatPrice, orderTotal } from '../models';
+import { formatPrice, orderTotal, priceOf } from '../models';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
 
 /** How long the last order stays on the screen when no new one comes in. */
 const SHOW_FOR = 10 * 60000;
 /** Drafts older than this are left over from an earlier session. */
 const DRAFT_MAX_AGE = 60 * 60000;
+/** From this many left (or fewer), a pizza or the total shows as almost sold out. */
+export const ALMOST_GONE = 5;
 
 /**
  * Screen facing the customer where they order. While the order is taken it shows what's in
  * it, with a QR code to follow it on their phone. Once sent, it shows the order number and
  * estimated time, still with the QR code unless the order taker hides it. In between it says
- * "Next customer". No menu, made for full screen.
+ * "Next customer". While waiting and ordering, the pizzas are listed with the ones (or the
+ * total) almost sold out marked, so customers know before they ask. Made for full screen.
  */
 @Component({
   selector: 'app-order-screen',
@@ -90,6 +93,34 @@ const DRAFT_MAX_AGE = 60 * 60000;
             <p class="muted">Your order shows here while it's taken.</p>
           }
         </div>
+      }
+      @if (menu(); as m) {
+        <section class="os-menu" aria-label="Our pizzas">
+          @if (m.total !== null && m.total <= almostGone) {
+            <p class="os-total-left" [class.gone]="m.total === 0">
+              @if (m.total === 0) {
+                These are the last pizzas for today
+              } @else {
+                Only <strong>{{ m.total }}</strong> {{ m.total === 1 ? 'pizza' : 'pizzas' }} left{{ m.inOrder ? ' after this order' : '' }}
+              }
+            </p>
+          }
+          <ul>
+            @for (item of m.items; track item.name) {
+              <li [style.border-left-color]="item.color" [class.gone]="item.left === 0">
+                <span class="os-menu-name">{{ item.name }}</span>
+                @if (item.price) {
+                  <span class="os-menu-price">{{ price(item.price) }}</span>
+                }
+                @if (item.left === 0) {
+                  <small class="os-left gone">Sold out</small>
+                } @else if (item.left !== null && item.left <= almostGone) {
+                  <small class="os-left">Only {{ item.left }} left</small>
+                }
+              </li>
+            }
+          </ul>
+        </section>
       }
       <footer class="os-footer">
         @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
@@ -168,6 +199,35 @@ export class OrderScreen {
       qr,
     };
   });
+
+  /**
+   * The pizzas on sale with how many are left, when that's few, and the total left. While an
+   * order is taken it counts that order too, so "Only 2 left" means 2 more can be added.
+   * Hidden once an order is sent and when everything is sold out (the screen says so).
+   */
+  protected menu = computed(() => {
+    const state = this.queue.state();
+    if (!state || this.queue.pizzasLeft() === 0) return null;
+    const building = this.building();
+    if (!building && this.current()) return null;
+    const inOrder = building ? (this.draft()?.pizzas ?? []) : [];
+    const totalLeft = this.queue.pizzasLeft();
+    const total = totalLeft === null ? null : Math.max(0, totalLeft - inOrder.length);
+    const items = state.menu
+      .filter((m) => m.enabled)
+      .map((m) => {
+        const n = this.queue.typeLeft().get(m.name) ?? null;
+        const mine = inOrder.filter((p) => p.name === m.name).length;
+        return {
+          name: m.name,
+          color: m.color,
+          price: priceOf(state, m.name),
+          left: n === null ? (total === 0 ? 0 : null) : total === 0 ? 0 : Math.max(0, n - mine),
+        };
+      });
+    return items.length ? { items, total, inOrder: inOrder.length > 0 } : null;
+  });
+  protected almostGone = ALMOST_GONE;
 
   /** The QR code is our own SVG made from our own link, so it's safe to insert. */
   private qr(orderId: string) {

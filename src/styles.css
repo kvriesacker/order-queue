@@ -1793,3 +1793,61 @@ app-install {
   font-size: 1.1rem;
   color: var(--ink, #2b1d16);
 }
+
+/* Customer order screen: the pizzas on sale, with the ones almost sold out marked */
+.os-menu {
+  padding: 1rem 0 0.4rem;
+  border-top: 1px solid #3a2d28;
+  margin-top: 1.5rem;
+}
+.os-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.os-menu li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.6rem;
+  background: #2a201c;
+  border-left: 0.4rem solid;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: 700;
+}
+.os-menu-price {
+  color: #b9a79a;
+  font-weight: 500;
+}
+.os-left {
+  background: #f2b84b;
+  color: #1b1412;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  font-size: 0.75em;
+  font-weight: 800;
+}
+.os-menu li.gone {
+  opacity: 0.55;
+}
+.os-menu li.gone .os-menu-name {
+  text-decoration: line-through;
+}
+.os-left.gone {
+  background: #c0392b;
+  color: #fff;
+}
+.os-total-left {
+  margin: 0 0 0.7rem;
+  font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+  font-weight: 700;
+  color: #f2b84b;
+}
+.os-total-left.gone {
+  color: #ff7b6b;
+}

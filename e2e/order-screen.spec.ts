@@ -101,3 +101,46 @@ test('the QR code shown while ordering is for the order that gets sent', async (
   await phone.goto(`/?emulator=127.0.0.1#/track/${sent}`);
   await expect(phone.locator('.track')).toBeVisible();
 });
+
+test('the customer screen lists the pizzas and warns when they are almost sold out', async ({ page, context }) => {
+  await page.goto(START);
+  await page.getByLabel(/Pizzas available in total/).fill('8');
+  await page.getByLabel('Maximum Margherita').fill('2');
+  await page.getByLabel('Maximum Funghi').fill('10');
+  await page.getByRole('button', { name: 'Start queue' }).click();
+  await tab(page, 'Orders').click();
+  const [screen] = await Promise.all([
+    context.waitForEvent('page'),
+    page.getByRole('link', { name: 'Customer screen ↗' }).click(),
+  ]);
+  await screen.waitForLoadState();
+  const item = (name: string) => screen.locator('.os-menu li', { hasText: name });
+
+  // Waiting for the next customer: every pizza on sale, the ones with few left marked.
+  await expect(screen.getByText('Next customer')).toBeVisible();
+  await expect(item('Margherita')).toContainText('Only 2 left');
+  await expect(item('Funghi')).toBeVisible();
+  await expect(item('Funghi').locator('.os-left')).toHaveCount(0);
+  await expect(screen.locator('.os-total-left')).toHaveCount(0);
+
+  // While ordering, it counts what's in the order: the customer sees what they can still add.
+  await page.locator('.menu-item', { hasText: 'Margherita' }).click();
+  await expect(item('Margherita')).toContainText('Only 1 left');
+  await page.locator('.menu-item', { hasText: 'Funghi' }).click();
+  await page.locator('.menu-item', { hasText: 'Funghi' }).click();
+  await expect(screen.locator('.os-total-left')).toHaveText(/Only 5 pizzas left after this order/);
+  await page.locator('.menu-item', { hasText: 'Margherita' }).click();
+  await expect(item('Margherita').locator('.os-left')).toHaveText('Sold out');
+  await expect(screen.locator('.os-total-left')).toHaveText(/Only 4 pizzas left after this order/);
+
+  // Once sent, the screen is about the order; the list is back for the next customer.
+  await page.getByRole('button', { name: 'Send to kitchen' }).click();
+  await expect(screen.locator('.os-number')).toHaveText('1');
+  await expect(screen.locator('.os-menu')).toHaveCount(0);
+  await page.locator('.sent').getByRole('button', { name: 'Next customer' }).click();
+  await expect(item('Margherita').locator('.os-left')).toHaveText('Sold out');
+  await expect(screen.locator('.os-total-left')).toHaveText(/^\s*Only 4 pizzas left\s*$/);
+
+  const width = await screen.evaluate(() => document.documentElement.scrollWidth);
+  expect(width).toBeLessThanOrEqual(screen.viewportSize()!.width);
+});
