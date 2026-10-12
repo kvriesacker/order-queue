@@ -1,8 +1,8 @@
 import { signal } from '@angular/core';
 
 /**
- * Full screen for the kitchen and the oven: only the pizzas to tick off, without the top bar,
- * tabs or settings. On while a station has it switched on.
+ * Full screen for staff pages (orders, kitchen, oven, counter): only the work, without the top
+ * bar, tabs or settings. On while a page has it switched on.
  */
 export const focusMode = signal(false);
 

@@ -1,11 +1,12 @@
-import { Component, DestroyRef, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { Order, PizzaStatus, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { TypeLimits } from './type-limits';
 import { Ovens } from './ovens';
 import { T, t } from '../i18n/i18n';
-import { enterFocus, focusMode, leaveFocus } from '../focus';
+import { focusMode } from '../focus';
+import { FocusToggle } from './focus-toggle';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -45,21 +46,13 @@ const STATIONS = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta, TypeLimits, Ovens, T],
+  imports: [Eta, TypeLimits, Ovens, FocusToggle, T],
   template: `
     <main class="page kitchen" [class.focus]="focus()">
       <section class="column">
         <h2 class="station-head">
           {{ config().title | t }} <span class="count">{{ waiting() }}</span>
-          @if (focus()) {
-            <button class="btn ghost small focus-toggle" type="button" (click)="leaveFocus()">
-              {{ 'Exit full screen' | t }}
-            </button>
-          } @else {
-            <button class="btn small focus-toggle" type="button" (click)="enterFocus()">
-              ⛶ {{ 'Full screen' | t }}
-            </button>
-          }
+          <app-focus-toggle />
         </h2>
         <div class="kitchen-grid one-column">
           @for (entry of active(); track entry.order.id) {
@@ -81,7 +74,8 @@ const STATIONS = {
               <!-- Only what's left to tick off: a ticked pizza moves to the list on the right. -->
               <ul class="pizzas">
                 @for (p of entry.todoPizzas; track p.item + '-' + p.unit) {
-                  <li [class]="rowClass(p)">
+                  <!-- The whole row ticks the pizza off; the button is there to show what a tap does. -->
+                  <li [class]="rowClass(p) + ' tap-row'" (click)="set(entry.order, p, config().to)">
                     <span class="chip" [style.background]="p.color" [style.color]="textOn(p.color)">
                       {{ p.name }}
                     </span>
@@ -91,11 +85,7 @@ const STATIONS = {
                       }
                     </span>
                     <span class="pizza-actions">
-                      <button
-                        class="btn success"
-                        type="button"
-                        (click)="set(entry.order, p, config().to)"
-                      >
+                      <button class="btn success" type="button">
                         {{ config().action | t }}
                       </button>
                     </span>
@@ -189,15 +179,6 @@ export class Station {
   protected config = computed(() => STATIONS[this.station()]);
   protected textOn = textOn;
   protected focus = focusMode;
-  protected enterFocus = enterFocus;
-  protected leaveFocus = leaveFocus;
-
-  constructor() {
-    // Full screen belongs to this page; going to another tab shows the menu again.
-    inject(DestroyRef).onDestroy(() => {
-      if (focusMode()) leaveFocus();
-    });
-  }
 
   /** Orders with at least one pizza for this station, oldest first. */
   protected active = computed(() => {

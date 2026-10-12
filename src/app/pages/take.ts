@@ -7,13 +7,15 @@ import { QueueService } from '../queue.service';
 import { clockTime, estimateIfSent, minutesUntil } from '../estimate';
 import { OrderCard } from './order-card';
 import { T, t } from '../i18n/i18n';
+import { focusMode } from '../focus';
+import { FocusToggle } from './focus-toggle';
 
 @Component({
   selector: 'app-take',
-  imports: [FormsModule, OrderCard, T],
+  imports: [FormsModule, OrderCard, FocusToggle, T],
   host: { '(document:keydown.escape)': 'showOpen.set(false)' },
   template: `
-    <main class="page take">
+    <main class="page take" [class.focus]="focus()">
       <section class="card take-card">
         <div class="take-pick stack">
         <div class="take-head">
@@ -30,6 +32,7 @@ import { T, t } from '../i18n/i18n';
             <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
               >{{ 'Customer screen' | t }} ↗</a
             >
+            <app-focus-toggle />
           </span>
         </div>
         @if (left() !== null) {
@@ -265,6 +268,7 @@ import { T, t } from '../i18n/i18n';
 })
 export class Take {
   protected queue = inject(QueueService);
+  protected focus = focusMode;
   protected menu = computed(() => (this.queue.state()?.menu ?? []).filter((m) => m.enabled));
   protected cart = signal<NewOrderItem[]>([]);
   protected quickNotes = QUICK_NOTES;

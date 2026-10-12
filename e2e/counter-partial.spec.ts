@@ -45,12 +45,49 @@ test('kitchen and oven in full screen show only what to tick off', async ({ page
   await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
   await expect(page.locator('.recent li')).toHaveText([/Margherita/]);
   await expect(page.locator('.kitchen-order .pizzas li')).toHaveCount(2);
+  // Tapping anywhere on the row ticks the pizza off, not only the button.
+  await page.locator('.kitchen-order .pizzas li .chip').first().click();
+  await expect(page.locator('.recent li').first()).toContainText('Funghi');
+  await expect(page.locator('.kitchen-order .pizzas li')).toHaveCount(1);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
 
   await page.getByRole('button', { name: 'Exit full screen' }).click();
   await expect(tab(page, 'Oven')).toBeVisible();
   await expect(page.locator('app-type-limits')).toHaveCount(1);
+});
+
+test('the whole oven row bakes the pizza, once', async ({ page }) => {
+  await bigOrder(page);
+  await tab(page, 'Kitchen').click();
+  await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
+  await tab(page, 'Oven').click();
+  await page.locator('.kitchen-order .pizzas li', { hasText: 'Margherita' }).click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('.recent li')).toHaveText([/#1\s*Margherita/]);
+  // The button inside the row counts as one tap, not two.
+  await tab(page, 'Kitchen').click();
+  await page.locator('.kitchen-order .pizzas li').first().getByRole('button', { name: 'Prepared', exact: true }).click();
+  await expect(page.locator('.kitchen-order')).toContainText('2/3 prepared');
+});
+
+test('orders and counter have a full screen too', async ({ page }) => {
+  await bigOrder(page);
+  for (const name of ['Orders', 'Counter']) {
+    await tab(page, name).click();
+    await page.getByRole('button', { name: /Full screen/ }).click();
+    await expect(page.getByRole('navigation')).toHaveCount(0);
+    if (name === 'Orders') {
+      await expect(page.locator('.menu-item', { hasText: 'Margherita' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Open orders/ })).toBeVisible();
+    } else {
+      await expect(page.getByRole('heading', { name: /From the kitchen/ })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Show customer screen' })).toHaveCount(0);
+    }
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await page.getByRole('button', { name: 'Exit full screen' }).click();
+    await expect(page.getByRole('navigation')).toBeVisible();
+  }
 });
 
 async function bake(page: Page, pizzas: number) {

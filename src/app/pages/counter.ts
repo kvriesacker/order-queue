@@ -6,15 +6,20 @@ import { OrderCard } from './order-card';
 import { CounterPizzas, partlyCalled, waitingAtCounter } from './counter-pizzas';
 import { Eta } from './eta';
 import { T } from '../i18n/i18n';
+import { focusMode } from '../focus';
+import { FocusToggle } from './focus-toggle';
 
 @Component({
   selector: 'app-counter',
-  imports: [OrderCard, CounterPizzas, RouterLink, Eta, T],
+  imports: [OrderCard, CounterPizzas, RouterLink, Eta, FocusToggle, T],
   template: `
-    <main class="page">
+    <main class="page" [class.focus]="focus()">
       <div class="toolbar">
-        <a class="btn primary big" routerLink="../display">{{ 'Show customer screen' | t }}</a>
-        <a class="btn" [href]="displayLink()" target="_blank" rel="noopener">{{ 'Open in new window' | t }}</a>
+        @if (!focus()) {
+          <a class="btn primary big" routerLink="../display">{{ 'Show customer screen' | t }}</a>
+          <a class="btn" [href]="displayLink()" target="_blank" rel="noopener">{{ 'Open in new window' | t }}</a>
+        }
+        <app-focus-toggle />
       </div>
       <div class="board counter-board">
         <section class="column making-col">
@@ -88,6 +93,7 @@ import { T } from '../i18n/i18n';
 })
 export class Counter {
   protected queue = inject(QueueService);
+  protected focus = focusMode;
   /**
    * Orders with baked pizzas not on the customer screen yet. A big order shown in part is
    * here with its other pizzas and under On the customer screen with the shown ones.
