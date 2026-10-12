@@ -1,4 +1,4 @@
-import { DisplayStage, Order, OrderStatus, QueueState, displayStage, stageCounts } from './models';
+import { DisplayStage, Order, OrderStatus, QueueState, displayStage, pizzaStage, stageCounts } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { pizzaSummary } from './estimate';
 
@@ -21,10 +21,18 @@ export interface OrderTrack {
   stage?: DisplayStage | null;
   /** How many pizzas are in each block, as an order can be split (older versions don't send it). */
   stages?: Partial<Record<DisplayStage, number>>;
+  /** Each pizza and its step, and whether the customer already has it (older versions don't send it). */
+  items?: TrackPizza[];
   /** Estimated ready time, cut to the minute, as clocks show it; absent once the order is ready. */
   eta?: number;
   /** The queue's language, which the follow page speaks (older versions don't send it). */
   lang?: 'nl' | 'en';
+}
+
+export interface TrackPizza {
+  name: string;
+  stage: DisplayStage | null;
+  handed?: boolean;
 }
 
 /** Orders stay followable for this long after they're picked up or cancelled. */
@@ -43,6 +51,13 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     status: order.status,
     stage: displayStage(order),
     stages: stageCounts(order),
+    items: order.items.flatMap((item, i) =>
+      item.units.map((_, u) => ({
+        name: item.name,
+        stage: pizzaStage(order, i, u),
+        ...(item.times[u]?.handed ? { handed: true } : {}),
+      })),
+    ),
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
     lang: state.lang ?? 'nl',
   };

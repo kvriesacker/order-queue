@@ -244,7 +244,7 @@ test("the order is saved for the customer's follow app as the stations work on i
   await markAll(oven, 1, 'Baked');
   await expect
     .poll(() => savedTrack(orderId), { timeout: 20_000 })
-    .toMatchObject({ status: 'ready', stage: 'baked', stages: { baked: 1 } });
+    .toMatchObject({ status: 'ready', stage: 'baked', stages: { baked: 1 }, items: [{ name: 'Margherita', stage: 'baked' }] });
   await first.getByRole('navigation').getByRole('link', { name: 'Counter' }).click();
   await first
     .locator('app-order-card', { hasText: '#1' })
