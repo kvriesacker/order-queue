@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { QueueService } from '../queue.service';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
 import { DisplayStage, Order, displayStage } from '../models';
+import { T, speakToCustomers } from '../i18n/i18n';
 
 const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
   { stage: 'ordered', title: 'Ordered', empty: 'No new orders.' },
@@ -17,18 +18,18 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
  */
 @Component({
   selector: 'app-display',
-  imports: [RouterLink],
+  imports: [RouterLink, T],
   template: `
     <main class="display" (dblclick)="fullscreen()">
       @for (col of columns(); track col.stage) {
         <section class="display-col" [class]="col.stage">
-          <h2>{{ col.title }}</h2>
+          <h2>{{ col.title | t }}</h2>
           <ol class="prep-list" [class.ready-list]="col.stage === 'ready'">
             @for (p of col.orders; track p.id) {
               <li [class.fresh]="col.stage === 'ready' && p.number === freshest()">
                 <span class="prep-num">{{ p.number }}</span>
                 <span class="prep-who">
-                  <strong>{{ p.name || 'Order ' + p.number }}</strong>
+                  <strong>{{ p.name || ('Order {n}' | t: { n: p.number }) }}</strong>
                   <span class="prep-pizzas">{{ p.pizzas }}</span>
                 </span>
                 @if (col.stage !== 'ready' && p.eta) {
@@ -39,7 +40,7 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
               </li>
             } @empty {
               @if (col.empty) {
-                <li class="prep-empty">{{ col.empty }}</li>
+                <li class="prep-empty">{{ col.empty | t }}</li>
               }
             }
           </ol>
@@ -49,18 +50,18 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
         <span
           >{{ queue.state()?.name }}
           @if (queue.pizzasLeft() === 0) {
-            <span class="pill left low">Sold out</span>
+            <span class="pill left low">{{ 'Sold out' | t }}</span>
           }
         </span>
         <span class="display-controls">
           @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
-            <span class="pill offline">Offline</span>
+            <span class="pill offline">{{ 'Offline' | t }}</span>
           }
           <button type="button" (click)="toggleSound()">
-            {{ sound() ? '🔔 Sound on' : '🔕 Sound off' }}
+            {{ (sound() ? '🔔 Sound on' : '🔕 Sound off') | t }}
           </button>
-          <button type="button" (click)="fullscreen()">Full screen</button>
-          <a routerLink="../counter">Back</a>
+          <button type="button" (click)="fullscreen()">{{ 'Full screen' | t }}</button>
+          <a routerLink="../counter">{{ 'Back' | t }}</a>
         </span>
       </footer>
     </main>
@@ -103,6 +104,8 @@ export class Display {
   private primed = false;
 
   constructor() {
+    // Customers read this screen: it speaks the queue's language.
+    speakToCustomers(() => this.queue.state()?.lang);
     effect(() => {
       const id = this.id();
       untracked(() => this.queue.open(id));

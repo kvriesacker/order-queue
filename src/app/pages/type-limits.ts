@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { kitchenLeft, typeSold } from '../models';
 import { QueueService } from '../queue.service';
+import { T } from '../i18n/i18n';
 
 /**
  * For the kitchen: how many of each pizza it can still make, to change as ingredients run
@@ -9,19 +10,20 @@ import { QueueService } from '../queue.service';
  */
 @Component({
   selector: 'app-type-limits',
+  imports: [T],
   template: `
     <ul class="type-limits">
       @for (t of types(); track t.name) {
         <li [class.out]="t.sellable === 0">
           <span class="type-name" [style.border-left-color]="t.color">{{ t.name }}</span>
-          <span class="type-count muted">{{ t.sold }} sold</span>
+          <span class="type-count muted">{{ '{n} sold' | t: { n: t.sold } }}</span>
           <span class="type-left-edit">
             <button
               class="btn small step"
               type="button"
               [disabled]="t.left === null || t.left === 0"
               (click)="queue.setTypeLeft(t.name, t.left! - 1)"
-              [attr.aria-label]="'One less ' + t.name"
+              [attr.aria-label]="'One less {pizza}' | t: { pizza: t.name }"
             >
               −
             </button>
@@ -30,45 +32,47 @@ import { QueueService } from '../queue.service';
               min="0"
               max="99999"
               inputmode="numeric"
-              placeholder="No limit"
+              [placeholder]="'No limit' | t"
               [value]="t.left ?? ''"
               (change)="setLeft(t.name, $any($event.target))"
-              [attr.aria-label]="t.name + ' left'"
+              [attr.aria-label]="'{pizza} left' | t: { pizza: t.name }"
             />
             <button
               class="btn small step"
               type="button"
               [disabled]="t.left === null"
               (click)="queue.setTypeLeft(t.name, t.left! + 1)"
-              [attr.aria-label]="'One more ' + t.name"
+              [attr.aria-label]="'One more {pizza}' | t: { pizza: t.name }"
             >
               +
             </button>
           </span>
           @if (t.sellable === 0) {
-            <strong class="type-out">Sold out</strong>
+            <strong class="type-out">{{ 'Sold out' | t }}</strong>
           } @else {
             <button
               class="btn small danger"
               type="button"
               (click)="queue.setTypeLimit(t.name, { soldOut: true })"
             >
-              Sold out
+              {{ 'Sold out' | t }}
             </button>
           }
           @if (t.left !== null) {
             <button class="btn ghost small type-unlimited" type="button" (click)="queue.setTypeLeft(t.name, null)">
-              No limit
+              {{ 'No limit' | t }}
             </button>
           }
         </li>
       } @empty {
-        <li class="muted">No pizzas on the menu.</li>
+        <li class="muted">{{ 'No pizzas on the menu.' | t }}</li>
       }
     </ul>
     <p class="muted small">
-      Type how many you can still make, counting the ordered pizzas you haven’t prepared yet.
-      Leave it empty for no limit.
+      {{
+        'Type how many you can still make, counting the ordered pizzas you haven’t prepared yet. Leave it empty for no limit.'
+          | t
+      }}
     </p>
   `,
 })

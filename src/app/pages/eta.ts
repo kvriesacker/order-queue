@@ -1,14 +1,16 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { clockTime, minutesUntil } from '../estimate';
 import { QueueService } from '../queue.service';
+import { T } from '../i18n/i18n';
 
 /** "Ready ≈ 18:42 · 12 min" for an open order; nothing once it's baked. */
 @Component({
   selector: 'app-eta',
+  imports: [T],
   template: `
     @if (eta(); as t) {
-      <span class="eta" [title]="'Estimated ready time'"
-        >⏱ {{ compact() ? '' : 'Ready ≈ ' }}{{ clock(t)
+      <span class="eta" [title]="'Estimated ready time' | t"
+        >⏱ {{ compact() ? '' : ('Ready ≈' | t) + ' ' }}{{ clock(t)
         }}<span class="eta-min"> · {{ until(t) }}</span></span
       >
     }

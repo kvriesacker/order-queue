@@ -1,5 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
+/**
+ * The tests were written in English: each test device starts switched to English (the app's
+ * default is Dutch). Tests for the languages themselves start without this.
+ */
+export const ENGLISH = {
+  cookies: [],
+  origins: [{ origin: 'http://127.0.0.1:4321', localStorage: [{ name: 'pizza-queue:lang', value: 'en' }] }],
+};
+
 // Browser tests run against the production build (`ng build` first) and a local Firebase
 // emulator (needs Java), so they never touch the real Firebase project.
 export default defineConfig({
@@ -11,6 +20,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4321/',
     // A stuck tap fails on its own line (with the reason) instead of only timing out the test.
     actionTimeout: 10_000,
+    storageState: ENGLISH,
     launchOptions: { executablePath: process.env['CHROMIUM_PATH'] || undefined },
   },
   projects: [

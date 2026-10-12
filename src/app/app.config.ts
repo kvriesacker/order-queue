@@ -1,5 +1,6 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, withComponentInputBinding, withHashLocation } from '@angular/router';
+import { TitleStrategy, provideRouter, withComponentInputBinding, withHashLocation } from '@angular/router';
+import { TranslatedTitle } from './i18n/title';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -7,5 +8,6 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withHashLocation(), withComponentInputBinding()),
+    { provide: TitleStrategy, useClass: TranslatedTitle },
   ],
 };

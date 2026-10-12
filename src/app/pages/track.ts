@@ -3,7 +3,9 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { OrderTrack, TrackAlert, trackAlert, trackCrypto } from '../tracking';
 import { clockTime, minutesUntil } from '../estimate';
+import { T, customerLang, t } from '../i18n/i18n';
 
+/** Labels are texts in the Dutch dictionary; the template translates them. */
 const STEPS = [
   { label: 'Ordered', done: ['new', 'in-progress', 'ready', 'ready-for-customer', 'collected'] },
   { label: 'Being made', done: ['in-progress', 'ready', 'ready-for-customer', 'collected'] },
@@ -14,11 +16,12 @@ const STEPS = [
 /** A customer following their own order on their phone, opened from the QR code. */
 @Component({
   selector: 'app-track',
+  imports: [T],
   template: `
     <main class="track" [class.is-ready]="order()?.status === 'ready-for-customer'">
       @if (order(); as o) {
         <p class="track-shop">{{ o.shop }}</p>
-        <p class="track-label">Your order</p>
+        <p class="track-label">{{ 'Your order' | t }}</p>
         <p class="track-number">{{ o.number }}</p>
         @if (o.customer) {
           <p class="track-name">{{ o.customer }}</p>
@@ -27,18 +30,18 @@ const STEPS = [
 
         @switch (o.status) {
           @case ('ready-for-customer') {
-            <p class="track-big">Ready! Please collect it at the counter.</p>
+            <p class="track-big">{{ 'Ready! Please collect it at the counter.' | t }}</p>
           }
           @case ('collected') {
-            <p class="track-big">Picked up. Enjoy your pizza!</p>
+            <p class="track-big">{{ 'Picked up. Enjoy your pizza!' | t }}</p>
           }
           @case ('cancelled') {
-            <p class="track-big">This order was cancelled. Please ask at the counter.</p>
+            <p class="track-big">{{ 'This order was cancelled. Please ask at the counter.' | t }}</p>
           }
           @default {
             @if (o.eta) {
               <p class="track-eta">
-                Ready around <strong>{{ clock(o.eta) }}</strong>
+                {{ 'Ready around' | t }} <strong>{{ clock(o.eta) }}</strong>
                 <span>{{ until(o.eta) }}</span>
               </p>
             }
@@ -46,13 +49,13 @@ const STEPS = [
         }
 
         @if (alert() === 'baking' && o.status !== 'ready-for-customer' && o.status !== 'collected') {
-          <p class="track-alert" role="status">Your pizza is in the oven!</p>
+          <p class="track-alert" role="status">{{ 'Your pizza is in the oven!' | t }}</p>
         }
 
         @if (o.status !== 'cancelled') {
           <ol class="track-steps">
             @for (s of steps; track s.label) {
-              <li [class.done]="s.done.includes(o.status)">{{ s.label }}</li>
+              <li [class.done]="s.done.includes(o.status)">{{ s.label | t }}</li>
             }
           </ol>
         }
@@ -60,40 +63,45 @@ const STEPS = [
           <div class="track-alerts">
             @switch (permission()) {
               @case ('granted') {
-                <p>🔔 Alerts on: you get a message when your pizza goes in the oven and when it's ready.</p>
+                <p>🔔 {{ "Alerts on: you get a message when your pizza goes in the oven and when it's ready." | t }}</p>
               }
               @case ('default') {
                 <button class="btn primary" type="button" (click)="enableAlerts()">
-                  Alert me when it's baking and ready
+                  {{ "Alert me when it's baking and ready" | t }}
                 </button>
               }
               @case ('denied') {
                 <p class="muted">
-                  Alerts are blocked for this site in your browser settings. This page still
-                  buzzes and changes when your order is ready.
+                  {{
+                    'Alerts are blocked for this site in your browser settings. This page still buzzes and changes when your order is ready.'
+                      | t
+                  }}
                 </p>
               }
               @default {
                 <p class="muted">
-                  Keep this page open: it buzzes when your pizza is baking and when it's ready. On
-                  an iPhone, add it to your Home Screen to get alerts.
+                  {{
+                    "Keep this page open: it buzzes when your pizza is baking and when it's ready. On an iPhone, add it to your Home Screen to get alerts."
+                      | t
+                  }}
                 </p>
               }
             }
           </div>
         }
         <p class="track-foot muted">
-          This page updates by itself.
+          {{ 'This page updates by itself.' | t }}
           @if (!online()) {
-            <span class="pill offline">Reconnecting…</span>
+            <span class="pill offline">{{ 'Reconnecting…' | t }}</span>
           }
         </p>
       } @else {
-        <p class="track-big">{{ online() ? 'Looking up your order…' : 'Connecting…' }}</p>
+        <p class="track-big">{{ (online() ? 'Looking up your order…' : 'Connecting…') | t }}</p>
         @if (slow()) {
           <p class="muted">
-            Your order is still being taken. It shows up here as soon as it's sent to the
-            kitchen.
+            {{
+              "Your order is still being taken. It shows up here as soon as it's sent to the kitchen." | t
+            }}
           </p>
         }
       }
@@ -126,6 +134,7 @@ export class Track {
       clearInterval(timer);
       clearTimeout(slow);
       this.stop?.();
+      customerLang.set(null);
     });
     effect(() => this.follow(this.order$()));
     // Buzz the phone once when the order is ready to collect, even if it was opened just then.
@@ -153,13 +162,16 @@ export class Track {
     navigator.vibrate?.(alert === 'ready' ? [300, 100, 300, 100, 300] : [200]);
     this.beep(alert === 'ready' ? 2 : 1);
     if (this.permission() !== 'granted') return;
-    const title = alert === 'ready' ? `Order ${track.number} is ready!` : `Order ${track.number} is in the oven`;
+    const title =
+      alert === 'ready'
+        ? t('Order {n} is ready!', { n: track.number })
+        : t('Order {n} is in the oven', { n: track.number });
     const body =
       alert === 'ready'
-        ? 'Please collect it at the counter.'
+        ? t('Please collect it at the counter.')
         : track.eta
-          ? `Ready around ${clockTime(track.eta)}.`
-          : 'Almost there.';
+          ? t('Ready around {time}.', { time: clockTime(track.eta) })
+          : t('Almost there.');
     const options: NotificationOptions = { body, tag: `order-${this.order$()}`, icon: 'icons/icon-192.png' };
     // Through the service worker where there is one: phones only show notifications that way.
     const plain = () => void new Notification(title, options);
@@ -206,6 +218,8 @@ export class Track {
           if (!track || orderId !== this.following) return;
           if (JSON.stringify(track) === JSON.stringify(this.order())) return;
           const alert = trackAlert(this.order(), track);
+          // A page for the customer: it speaks the queue's language.
+          customerLang.set(track.lang ?? 'nl');
           this.order.set(track);
           if (alert) this.tell(alert, track);
         });

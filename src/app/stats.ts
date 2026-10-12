@@ -1,10 +1,13 @@
 import { Order, QueueState, orderTotal } from './models';
+import { t } from './i18n/i18n';
 
 const MINUTE = 60000;
 /** Orders are grouped into blocks of this many minutes to find the busy moments. */
 export const BLOCK_MINUTES = 15;
 
 export interface PhaseStat {
+  /** Which step this is, for code; `label` is the name shown on screen. */
+  step: 'prepare' | 'bake' | 'counter';
   label: string;
   /** What the host set, in minutes. */
   setting: number;
@@ -115,7 +118,8 @@ export function queueStats(state: QueueState, archived: Order[] = []): QueueStat
     .map((o) => o.calledAt! - o.bakedAt!);
   const waits = sold.filter((o) => o.calledAt).map((o) => o.calledAt! - o.createdAt);
 
-  const phase = (label: string, setting: number, samples: number[]): PhaseStat => ({
+  const phase = (step: PhaseStat['step'], label: string, setting: number, samples: number[]): PhaseStat => ({
+    step,
     label,
     setting,
     average: average(samples),
@@ -150,9 +154,9 @@ export function queueStats(state: QueueState, archived: Order[] = []): QueueStat
     blocks,
     busiest,
     phases: [
-      phase('Prepare (per pizza)', state.timing.prepareMinutes, prepareGaps),
-      phase('Bake', state.timing.bakeMinutes, bakeTimes),
-      phase('Counter', state.timing.counterMinutes, counterTimes),
+      phase('prepare', t('Prepare (per pizza)'), state.timing.prepareMinutes, prepareGaps),
+      phase('bake', t('Bake'), state.timing.bakeMinutes, bakeTimes),
+      phase('counter', t('Counter'), state.timing.counterMinutes, counterTimes),
     ],
     wait: {
       average: average(waits),

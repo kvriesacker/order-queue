@@ -1,11 +1,12 @@
 import { Component, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MenuItem } from '../models';
+import { T } from '../i18n/i18n';
 
 /** Check pizzas on or off, set an optional maximum per pizza, pick colors and add new ones. */
 @Component({
   selector: 'app-menu-editor',
-  imports: [FormsModule],
+  imports: [FormsModule, T],
   template: `
     <ul class="menu-editor">
       @for (item of menu(); track $index) {
@@ -26,10 +27,10 @@ import { MenuItem } from '../models';
             step="0.5"
             inputmode="decimal"
             [placeholder]="'€ ' + (defaultPrice() || '–')"
-            title="Price of this pizza (empty: the general price)"
+            [title]="'Price of this pizza (empty: the general price)' | t"
             [value]="item.price || ''"
             (change)="update($index, { price: priceFrom($any($event.target).value) })"
-            [attr.aria-label]="'Price ' + item.name"
+            [attr.aria-label]="'Price {name}' | t: { name: item.name }"
           />
           <input
             type="number"
@@ -37,24 +38,24 @@ import { MenuItem } from '../models';
             min="0"
             max="99999"
             inputmode="numeric"
-            placeholder="Max"
-            title="How many of this pizza can be made (empty: no limit)"
+            [placeholder]="'Max' | t"
+            [title]="'How many of this pizza can be made (empty: no limit)' | t"
             [value]="item.max || ''"
             (change)="update($index, { max: maxFrom($any($event.target).value) })"
-            [attr.aria-label]="'Maximum ' + item.name"
+            [attr.aria-label]="'Maximum {name}' | t: { name: item.name }"
           />
           <input
             type="color"
             class="swatch"
             [value]="item.color"
             (input)="update($index, { color: $any($event.target).value })"
-            [attr.aria-label]="'Color for ' + item.name"
+            [attr.aria-label]="'Color for {name}' | t: { name: item.name }"
           />
           <button
             class="btn ghost small"
             type="button"
             (click)="remove($index)"
-            aria-label="Remove"
+            [attr.aria-label]="'Remove' | t"
           >
             ✕
           </button>
@@ -67,7 +68,7 @@ import { MenuItem } from '../models';
         [(ngModel)]="newName"
         [ngModelOptions]="{ standalone: true }"
         (keydown.enter)="$event.preventDefault(); add()"
-        placeholder="Add a pizza…"
+        [placeholder]="'Add a pizza…' | t"
         maxlength="40"
       />
       <input
@@ -75,16 +76,18 @@ import { MenuItem } from '../models';
         class="swatch"
         [(ngModel)]="newColor"
         [ngModelOptions]="{ standalone: true }"
-        aria-label="Color for the new pizza"
+        [attr.aria-label]="'Color for the new pizza' | t"
       />
-      <button class="btn" type="button" [disabled]="!newName.trim()" (click)="add()">Add</button>
+      <button class="btn" type="button" [disabled]="!newName.trim()" (click)="add()">{{ 'Add' | t }}</button>
     </div>
     <p class="muted small">
-      €: a price for this pizza (empty: the general price below). Max: how many of a pizza the
-      ingredients allow (empty: no limit).
+      {{
+        '€: a price for this pizza (empty: the general price below). Max: how many of a pizza the ingredients allow (empty: no limit).'
+          | t
+      }}
     </p>
     @if (duplicate()) {
-      <p class="error">That pizza is already on the list.</p>
+      <p class="error">{{ 'That pizza is already on the list.' | t }}</p>
     }
   `,
 })

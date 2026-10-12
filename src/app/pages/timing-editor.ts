@@ -1,6 +1,8 @@
 import { Component, model } from '@angular/core';
 import { Timing } from '../models';
+import { T } from '../i18n/i18n';
 
+/** Labels and hints are English keys of the Dutch dictionary, translated in the template. */
 type Field = { key: keyof Timing; label: string; hint: string };
 
 const FIELDS: Field[] = [
@@ -17,11 +19,12 @@ const OVEN_FIELDS: Field[] = [
 /** The host's starting guess for how long each phase takes. */
 @Component({
   selector: 'app-timing-editor',
+  imports: [T],
   template: `
     <label class="max-pizzas">
       <span
-        >Pizzas available in total
-        <span class="muted">(how many you can make; 0 = no limit)</span></span
+        >{{ 'Pizzas available in total' | t }}
+        <span class="muted">{{ '(how many you can make; 0 = no limit)' | t }}</span></span
       >
       <input
         type="number"
@@ -35,7 +38,8 @@ const OVEN_FIELDS: Field[] = [
     </label>
     <label class="max-pizzas">
       <span
-        >Price per pizza in € <span class="muted">(0 = don't show prices; set other prices per pizza above)</span></span
+        >{{ 'Price per pizza in €' | t }}
+        <span class="muted">{{ "(0 = don't show prices; set other prices per pizza above)" | t }}</span></span
       >
       <input
         type="number"
@@ -45,14 +49,14 @@ const OVEN_FIELDS: Field[] = [
         inputmode="decimal"
         [value]="timing().price"
         (input)="setPrice($any($event.target).valueAsNumber)"
-        aria-label="Price per pizza"
+        [attr.aria-label]="'Price per pizza' | t"
       />
     </label>
     <div class="grid3">
       @for (f of fields; track f.key) {
         <label>
           <span
-            >{{ f.label }} <span class="muted">({{ f.hint }})</span></span
+            >{{ f.label | t }} <span class="muted">({{ f.hint | t }})</span></span
           >
           <input
             type="number"
@@ -70,7 +74,7 @@ const OVEN_FIELDS: Field[] = [
       @for (f of ovenFields; track f.key) {
         <label>
           <span
-            >{{ f.label }} <span class="muted">({{ f.hint }})</span></span
+            >{{ f.label | t }} <span class="muted">({{ f.hint | t }})</span></span
           >
           <input
             type="number"
@@ -85,8 +89,10 @@ const OVEN_FIELDS: Field[] = [
       }
     </div>
     <p class="hint">
-      The ovens limit how many pizzas bake at once. The times are starting estimates. As pizzas get prepared, baked and called, each phase follows the
-      real times.
+      {{
+        'The ovens limit how many pizzas bake at once. The times are starting estimates. As pizzas get prepared, baked and called, each phase follows the real times.'
+          | t
+      }}
     </p>
   `,
 })

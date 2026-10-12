@@ -5,6 +5,7 @@ import { renderSVG } from 'uqr';
 import { OrderDraft, QueueService } from '../queue.service';
 import { formatPrice, orderTotal, priceOf } from '../models';
 import { clockTime, minutesUntil, pizzaSummary } from '../estimate';
+import { T, speakToCustomers, t } from '../i18n/i18n';
 
 /** How long the last order stays on the screen when no new one comes in. */
 const SHOW_FOR = 10 * 60000;
@@ -22,14 +23,14 @@ export const ALMOST_GONE = 5;
  */
 @Component({
   selector: 'app-order-screen',
-  imports: [RouterLink],
+  imports: [RouterLink, T],
   template: `
     <main class="order-screen" (dblclick)="fullscreen()">
       <p class="os-shop">{{ queue.state()?.name }}</p>
       @if (building(); as b) {
         <div class="os-body">
           <section class="os-order">
-            <p class="os-label">Your order</p>
+            <p class="os-label">{{ 'Your order' | t }}</p>
             @if (b.customer) {
               <p class="os-name">{{ b.customer }}</p>
             }
@@ -45,63 +46,65 @@ export const ALMOST_GONE = 5;
               }
             </ul>
             @if (b.total) {
-              <p class="os-total"><span>Total</span> <strong>{{ price(b.total) }}</strong></p>
+              <p class="os-total"><span>{{ 'Total' | t }}</span> <strong>{{ price(b.total) }}</strong></p>
             }
           </section>
           <section class="os-qr">
             <div class="qr" [innerHTML]="b.qr"></div>
-            <p class="os-scan">Scan me to follow your order</p>
+            <p class="os-scan">{{ 'Scan me to follow your order' | t }}</p>
           </section>
         </div>
       } @else if (current(); as c) {
         <div class="os-body" [class.no-qr]="!c.qr">
           <section class="os-order">
             @if (c.order; as order) {
-              <p class="os-label">Your order number</p>
+              <p class="os-label">{{ 'Your order number' | t }}</p>
               <p class="os-number">{{ order.number }}</p>
               @if (order.customer) {
                 <p class="os-name">{{ order.customer }}</p>
               }
               <p class="os-pizzas">{{ c.pizzas }}</p>
               @if (c.total) {
-                <p class="os-pizzas os-paid">Total <strong>{{ price(c.total) }}</strong></p>
+                <p class="os-pizzas os-paid">{{ 'Total' | t }} <strong>{{ price(c.total) }}</strong></p>
               }
               @if (c.eta) {
                 <p class="os-eta">
-                  Ready around <strong>{{ clock(c.eta) }}</strong>&nbsp;<span>({{ until(c.eta) }})</span>
+                  @let ready = around();
+                  {{ ready[0] }}<strong>{{ clock(c.eta) }}</strong>{{ ready[1] }}&nbsp;<span>({{ until(c.eta) }})</span>
                 </p>
               }
             } @else {
-              <p class="os-welcome">Thank you!</p>
-              <p class="muted">Your order is on its way to the kitchen.</p>
+              <p class="os-welcome">{{ 'Thank you!' | t }}</p>
+              <p class="muted">{{ 'Your order is on its way to the kitchen.' | t }}</p>
             }
           </section>
           @if (c.qr) {
             <section class="os-qr">
               <div class="qr" [innerHTML]="c.qr"></div>
-              <p class="os-scan">Scan me to follow your order</p>
+              <p class="os-scan">{{ 'Scan me to follow your order' | t }}</p>
             </section>
           }
         </div>
       } @else {
         <div class="os-idle">
           @if (queue.pizzasLeft() === 0) {
-            <p class="os-welcome">Sold out</p>
-            <p class="muted">Sorry, all pizzas are sold. Thanks for coming!</p>
+            <p class="os-welcome">{{ 'Sold out' | t }}</p>
+            <p class="muted">{{ 'Sorry, all pizzas are sold. Thanks for coming!' | t }}</p>
           } @else {
-            <p class="os-welcome">Next customer</p>
-            <p class="muted">Your order shows here while it's taken.</p>
+            <p class="os-welcome">{{ 'Next customer' | t }}</p>
+            <p class="muted">{{ "Your order shows here while it's taken." | t }}</p>
           }
         </div>
       }
       @if (menu(); as m) {
-        <section class="os-menu" aria-label="Our pizzas">
+        <section class="os-menu" [attr.aria-label]="'Our pizzas' | t">
           @if (m.total !== null && m.total <= almostGone) {
             <p class="os-total-left" [class.gone]="m.total === 0">
               @if (m.total === 0) {
-                These are the last pizzas for today
+                {{ 'These are the last pizzas for today' | t }}
               } @else {
-                Only <strong>{{ m.total }}</strong> {{ m.total === 1 ? 'pizza' : 'pizzas' }} left{{ m.inOrder ? ' after this order' : '' }}
+                @let only = totalLeft(m.total, m.inOrder);
+                {{ only[0] }}<strong>{{ m.total }}</strong>{{ only[1] }}
               }
             </p>
           }
@@ -113,9 +116,9 @@ export const ALMOST_GONE = 5;
                   <span class="os-menu-price">{{ price(item.price) }}</span>
                 }
                 @if (item.left === 0) {
-                  <small class="os-left gone">Sold out</small>
+                  <small class="os-left gone">{{ 'Sold out' | t }}</small>
                 } @else if (item.left !== null && item.left <= almostGone) {
-                  <small class="os-left">Only {{ item.left }} left</small>
+                  <small class="os-left">{{ 'Only {n} left' | t: { n: item.left } }}</small>
                 }
               </li>
             }
@@ -124,10 +127,10 @@ export const ALMOST_GONE = 5;
       }
       <footer class="os-footer">
         @if (queue.connection() === 'offline' || queue.connection() === 'no-backend') {
-          <span class="pill offline">Offline</span>
+          <span class="pill offline">{{ 'Offline' | t }}</span>
         }
-        <button type="button" (click)="fullscreen()">Full screen</button>
-        <a routerLink="../take">Back</a>
+        <button type="button" (click)="fullscreen()">{{ 'Full screen' | t }}</button>
+        <a routerLink="../take">{{ 'Back' | t }}</a>
       </footer>
     </main>
   `,
@@ -236,14 +239,39 @@ export class OrderScreen {
   }
 
   constructor() {
+    // Customers read this screen: it speaks the queue's language.
+    speakToCustomers(() => this.queue.state()?.lang);
     effect(() => {
       const id = this.id();
       untracked(() => this.queue.open(id));
     });
   }
 
+  /** "Ready around " and "" around the (bold) time, in the current language. */
+  protected around(): [string, string] {
+    return around(t('Ready around {time}'), '{time}');
+  }
+
+  /** The texts before and after the (bold) number of pizzas left, in the current language. */
+  protected totalLeft(n: number, inOrder: boolean): [string, string] {
+    const text = inOrder
+      ? n === 1
+        ? t('Only {n} pizza left after this order')
+        : t('Only {n} pizzas left after this order')
+      : n === 1
+        ? t('Only {n} pizza left')
+        : t('Only {n} pizzas left');
+    return around(text, '{n}');
+  }
+
   fullscreen() {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen?.().catch(() => {});
   }
+}
+
+/** A translated sentence split around its placeholder, so the value can be shown in bold. */
+function around(text: string, placeholder: string): [string, string] {
+  const i = text.indexOf(placeholder);
+  return i < 0 ? [text, ''] : [text.slice(0, i), text.slice(i + placeholder.length)];
 }

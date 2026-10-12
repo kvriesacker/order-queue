@@ -76,7 +76,8 @@ label {
   font-weight: 600;
   font-size: 0.9rem;
 }
-input {
+input,
+select {
   font: inherit;
   font-weight: 400;
   padding: 0.65rem 0.8rem;
@@ -85,7 +86,8 @@ input {
   background: #fff;
   min-width: 0;
 }
-input:focus {
+input:focus,
+select:focus {
   outline: 2px solid var(--crust);
   border-color: var(--crust);
 }
@@ -1208,6 +1210,10 @@ input.swatch {
   display: block;
   margin-bottom: 0.8rem;
 }
+.max-pizzas input {
+  display: block;
+  margin-top: 0.3rem;
+}
 .menu-item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1850,4 +1856,37 @@ app-install {
 }
 .os-total-left.gone {
   color: #ff7b6b;
+}
+
+/* NL / EN switch */
+.lang-switch {
+  display: inline-flex;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: none;
+}
+.lang-switch button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  min-height: 0;
+  cursor: pointer;
+}
+.lang-switch button[aria-pressed='true'] {
+  background: var(--crust, #e8a33d);
+  color: #fff;
+}
+.home-lang {
+  display: flex;
+  justify-content: flex-end;
+}
+.lang-select {
+  justify-self: start;
+  width: auto;
 }

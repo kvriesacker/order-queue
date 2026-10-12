@@ -4,6 +4,7 @@ import { QueueService } from '../queue.service';
 import { Eta } from './eta';
 import { TypeLimits } from './type-limits';
 import { Ovens } from './ovens';
+import { T, t } from '../i18n/i18n';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -26,6 +27,7 @@ const STATIONS = {
     from: 'new' as PizzaStatus,
     to: 'prepared' as PizzaStatus,
     action: 'Prepared',
+    progress: '{done}/{total} prepared',
     done: '✓ Prepared',
     recent: 'Just prepared',
   },
@@ -35,6 +37,7 @@ const STATIONS = {
     from: 'prepared' as PizzaStatus,
     to: 'baked' as PizzaStatus,
     action: 'Baked',
+    progress: '{done}/{total} baked',
     done: '✓ Baked',
     recent: 'Just baked',
   },
@@ -48,12 +51,12 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta, TypeLimits, Ovens],
+  imports: [Eta, TypeLimits, Ovens, T],
   template: `
     <main class="page kitchen">
       <section class="column">
         <h2>
-          {{ config().title }} <span class="count">{{ waiting() }}</span>
+          {{ config().title | t }} <span class="count">{{ waiting() }}</span>
         </h2>
         <div class="kitchen-grid one-column">
           @for (entry of active(); track entry.order.id) {
@@ -64,7 +67,7 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                   <span class="customer">{{ entry.order.customer }}</span>
                 }
                 <span class="age"
-                  >{{ entry.done }}/{{ entry.pizzas.length }} {{ config().action.toLowerCase() }} ·
+                  >{{ config().progress | t: { done: entry.done, total: entry.pizzas.length } }} ·
                   {{ age(entry.order) }}</span
                 >
               </header>
@@ -90,19 +93,19 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                           type="button"
                           (click)="set(entry.order, p, config().to)"
                         >
-                          {{ config().action }}
+                          {{ config().action | t }}
                         </button>
                       } @else if (p.status === config().to) {
-                        <span class="done">{{ config().done }}</span>
+                        <span class="done">{{ config().done | t }}</span>
                         <button
                           class="btn ghost small"
                           type="button"
                           (click)="set(entry.order, p, config().from)"
                         >
-                          Undo
+                          {{ 'Undo' | t }}
                         </button>
                       } @else {
-                        <span class="muted">{{ otherStep[p.status] }}</span>
+                        <span class="muted">{{ otherStep[p.status] | t }}</span>
                       }
                     </span>
                   </li>
@@ -110,12 +113,12 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
               </ul>
             </article>
           } @empty {
-            <p class="muted">{{ config().empty }}</p>
+            <p class="muted">{{ config().empty | t }}</p>
           }
         </div>
       </section>
       <section class="column narrow">
-        <h2>{{ config().recent }}</h2>
+        <h2>{{ config().recent | t }}</h2>
         <ul class="recent">
           @for (r of recent(); track r.order.id + '-' + r.item + '-' + r.unit) {
             <li>
@@ -130,36 +133,36 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                 class="btn ghost small"
                 type="button"
                 (click)="set(r.order, r, config().from)"
-                [attr.aria-label]="'Undo ' + r.name + ' of order ' + r.order.number"
+                [attr.aria-label]="'Undo {pizza} of order {n}' | t: { pizza: r.name, n: r.order.number }"
               >
-                Undo
+                {{ 'Undo' | t }}
               </button>
             </li>
           } @empty {
-            <li class="muted">Nothing yet.</li>
+            <li class="muted">{{ 'Nothing yet.' | t }}</li>
           }
         </ul>
         @if (station() === 'oven') {
-          <h2>Ovens</h2>
+          <h2>{{ 'Ovens' | t }}</h2>
           <app-ovens />
         }
         @if (station() === 'kitchen') {
           <h2>
-            Coming up for the oven <span class="count">{{ forOven().length }}</span>
+            {{ 'Coming up for the oven' | t }} <span class="count">{{ forOven().length }}</span>
           </h2>
           @for (order of forOven(); track order.id) {
             <div class="mini">
               <strong>#{{ order.number }}</strong>
-              <span class="muted">{{ order.prepared }} prepared</span>
+              <span class="muted">{{ '{n} prepared' | t: { n: order.prepared } }}</span>
             </div>
           } @empty {
-            <p class="muted">None.</p>
+            <p class="muted">{{ 'None.' | t }}</p>
           }
-          <h2 class="types-head">Pizzas left</h2>
+          <h2 class="types-head">{{ 'Pizzas left' | t }}</h2>
           <app-type-limits />
         } @else {
           <h2>
-            Baked, waiting at counter <span class="count">{{ baked().length }}</span>
+            {{ 'Baked, waiting at counter' | t }} <span class="count">{{ baked().length }}</span>
           </h2>
           @for (order of baked(); track order.id) {
             <div class="mini">
@@ -169,11 +172,11 @@ const OTHER_STEP: Record<PizzaStatus, string> = {
                 type="button"
                 (click)="queue.setStatus(order, 'in-progress')"
               >
-                Undo
+                {{ 'Undo' | t }}
               </button>
             </div>
           } @empty {
-            <p class="muted">None.</p>
+            <p class="muted">{{ 'None.' | t }}</p>
           }
         }
       </section>
@@ -244,12 +247,12 @@ export class Station {
 
   ago(at: number): string {
     const minutes = Math.floor((this.queue.now() - at) / 60000);
-    return !at || minutes < 1 ? 'just now' : `${minutes} min ago`;
+    return !at || minutes < 1 ? t('just now') : t('{n} min ago', { n: minutes });
   }
 
   age(order: Order): string {
     const minutes = Math.floor((this.queue.now() - order.createdAt) / 60000);
-    return minutes < 1 ? 'just now' : `${minutes} min`;
+    return minutes < 1 ? t('just now') : t('{n} min', { n: minutes });
   }
 }
 

@@ -1,4 +1,4 @@
-import { Injectable, computed, signal, untracked } from '@angular/core';
+import { Injectable, computed, effect, signal, untracked } from '@angular/core';
 import {
   DocumentSnapshot,
   Firestore,
@@ -32,6 +32,7 @@ import { estimateReady } from './estimate';
 import { OrderTrack, trackCrypto } from './tracking';
 import { EMULATOR_HOST, firestore } from './firebase';
 import { settle, trackChanges } from './sync';
+import { DEFAULT_LANG, Lang, queueLang, t } from './i18n/i18n';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline' | 'no-backend';
 
@@ -164,6 +165,8 @@ export class QueueService {
   private trackKeys = new Map<string, Promise<QueueCrypto>>();
 
   constructor() {
+    // Devices that haven't picked a language themselves follow the queue's.
+    effect(() => queueLang.set(this.state()?.lang ?? null));
     navigator.locks?.request(TAB_LOCK(this.deviceId), () => new Promise(() => undefined)).catch(() => undefined);
     window.addEventListener('online', () => {
       if (this.queueId && this.connection() === 'offline') this.connection.set('connecting');
@@ -177,11 +180,11 @@ export class QueueService {
   }
 
   /** Creates a new queue and returns its id. It's saved online when it opens. */
-  create(name: string, menu: MenuItem[], timing: Timing): string {
+  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang = DEFAULT_LANG): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
-      name: name.trim() || 'Pizza queue',
+      name: name.trim() || t('Pizza queue'),
       nextNumber: 1,
       menu,
       timing,
@@ -191,6 +194,7 @@ export class QueueService {
       ovensOut: [],
       hostEpoch: 0,
       hostId: '',
+      lang,
     };
     localStorage.setItem(COPY_KEY(id), JSON.stringify(state));
     return id;
@@ -272,6 +276,11 @@ export class QueueService {
 
   setMenu(menu: MenuItem[]): void {
     this.dispatch({ type: 'menu', menu });
+  }
+
+  /** The language devices that join start in, and customer screens speak. */
+  setLang(lang: Lang): void {
+    this.dispatch({ type: 'lang', lang });
   }
 
   setTiming(timing: Timing): void {

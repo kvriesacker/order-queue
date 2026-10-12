@@ -53,6 +53,13 @@ describe('applyAction', () => {
     expect(normalizeState({ ...s, ovensOut: undefined } as unknown as QueueState).ovensOut).toEqual([]);
   });
 
+  it('keeps the language for joining devices and customer screens; old queues speak Dutch', () => {
+    expect(normalizeState(empty).lang).toBe('nl');
+    const s = applyAction(empty, { type: 'lang', lang: 'en' });
+    expect(normalizeState(s).lang).toBe('en');
+    expect(applyAction(s, { type: 'lang', lang: 'fr' as 'en' })).toBe(s);
+  });
+
   it('charges the general price unless a pizza has its own, as set when ordered', () => {
     let s: QueueState = {
       ...empty,

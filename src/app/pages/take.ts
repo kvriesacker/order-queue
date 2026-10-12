@@ -6,17 +6,18 @@ const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten f
 import { QueueService } from '../queue.service';
 import { clockTime, estimateIfSent, minutesUntil } from '../estimate';
 import { OrderCard } from './order-card';
+import { T, t } from '../i18n/i18n';
 
 @Component({
   selector: 'app-take',
-  imports: [FormsModule, OrderCard],
+  imports: [FormsModule, OrderCard, T],
   host: { '(document:keydown.escape)': 'showOpen.set(false)' },
   template: `
     <main class="page take">
       <section class="card take-card">
         <div class="take-pick stack">
         <div class="take-head">
-          <h1>New order</h1>
+          <h1>{{ 'New order' | t }}</h1>
           <span class="take-links">
             <button
               class="btn small open-toggle"
@@ -24,23 +25,25 @@ import { OrderCard } from './order-card';
               aria-haspopup="dialog"
               (click)="showOpen.set(true)"
             >
-              Open orders <span class="count">{{ open().length }}</span>
+              {{ 'Open orders' | t }} <span class="count">{{ open().length }}</span>
             </button>
             <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
-              >Customer screen ↗</a
+              >{{ 'Customer screen' | t }} ↗</a
             >
           </span>
         </div>
         @if (left() !== null) {
           <p class="left-note" [class.low]="canAdd() === false || left()! <= 10">
             @if (overLimit()) {
-              Only <strong>{{ left() }}</strong> {{ left() === 1 ? 'pizza' : 'pizzas' }} left.
-              Remove {{ cart().length - left()! }} from this order to send it.
+              {{ 'Only' | t }} <strong>{{ left() }}</strong>
+              {{ (left() === 1 ? 'pizza left.' : 'pizzas left.') | t }}
+              {{ 'Remove {n} from this order to send it.' | t: { n: cart().length - left()! } }}
             } @else if (left() === 0) {
-              <strong>Sold out.</strong> No more pizzas can be sold.
+              <strong>{{ 'Sold out' | t }}.</strong> {{ 'No more pizzas can be sold.' | t }}
             } @else {
-              <strong>{{ left() }}</strong> {{ left() === 1 ? 'pizza' : 'pizzas' }} still available{{
-                cart().length ? ', ' + (left()! - cart().length) + ' after this order' : ''
+              <strong>{{ left() }}</strong>
+              {{ (left() === 1 ? 'pizza still available' : 'pizzas still available') | t }}{{
+                cart().length ? (', {n} after this order' | t: { n: left()! - cart().length }) : ''
               }}.
             }
           </p>
@@ -61,25 +64,25 @@ import { OrderCard } from './order-card';
               <span class="menu-item-name">
                 {{ pizza.name }}
                 @if (queue.typeLeft().get(pizza.name) === 0) {
-                  <small class="type-left">Sold out</small>
+                  <small class="type-left">{{ 'Sold out' | t }}</small>
                 } @else if (typeLeft !== null) {
-                  <small class="type-left">{{ typeLeft }} left</small>
+                  <small class="type-left">{{ '{n} left' | t: { n: typeLeft } }}</small>
                 }
               </span>
               @if (inOrder > 0) {
-                <span class="in-order-count" [attr.aria-label]="inOrder + ' in this order'">{{ inOrder }}</span>
+                <span class="in-order-count" [attr.aria-label]="'{n} in this order' | t: { n: inOrder }">{{ inOrder }}</span>
               }
             </button>
           }
         </div>
         <form class="inline" (ngSubmit)="addCustom()">
-          <input name="custom" [(ngModel)]="custom" placeholder="Something else…" maxlength="60" />
-          <button class="btn" type="submit" [disabled]="!custom.trim() || !canAdd()">Add</button>
+          <input name="custom" [(ngModel)]="custom" [placeholder]="'Something else…' | t" maxlength="60" />
+          <button class="btn" type="submit" [disabled]="!custom.trim() || !canAdd()">{{ 'Add' | t }}</button>
         </form>
         </div>
 
         <div class="take-cart stack">
-        <h2 class="cart-title">This order <span class="count">{{ cart().length }}</span></h2>
+        <h2 class="cart-title">{{ 'This order' | t }} <span class="count">{{ cart().length }}</span></h2>
         @if (cart().length) {
           <ol class="cart">
             @for (line of cart(); track $index; let i = $index) {
@@ -92,15 +95,15 @@ import { OrderCard } from './order-card';
                     type="button"
                     [disabled]="!canAdd() || typeLeftAfterCart(line.name) === 0"
                     (click)="duplicate(i)"
-                    aria-label="Add another one"
+                    [attr.aria-label]="'Add another one' | t"
                   >
-                    + same
+                    {{ '+ same' | t }}
                   </button>
                   <button
                     class="btn ghost small"
                     type="button"
                     (click)="remove(i)"
-                    aria-label="Remove this pizza"
+                    [attr.aria-label]="'Remove this pizza' | t"
                   >
                     ✕
                   </button>
@@ -113,7 +116,7 @@ import { OrderCard } from './order-card';
                       [class.on]="hasNote(line.note, q)"
                       (click)="toggleNote(i, q)"
                     >
-                      {{ q }}
+                      {{ q | t }}
                     </button>
                   }
                 </div>
@@ -122,14 +125,14 @@ import { OrderCard } from './order-card';
                   [ngModel]="line.note"
                   (ngModelChange)="setNote(i, $event)"
                   [ngModelOptions]="{ standalone: true }"
-                  placeholder="Note for this pizza…"
+                  [placeholder]="'Note for this pizza…' | t"
                   maxlength="120"
                 />
               </li>
             }
           </ol>
         } @else {
-          <p class="muted">Tap a pizza to add it. Each pizza gets its own line and note.</p>
+          <p class="muted">{{ 'Tap a pizza to add it. Each pizza gets its own line and note.' | t }}</p>
         }
         </div>
 
@@ -147,7 +150,7 @@ import { OrderCard } from './order-card';
             </tbody>
             <tfoot>
               <tr>
-                <th colspan="2">Total ({{ t.count }} {{ t.count === 1 ? 'pizza' : 'pizzas' }})</th>
+                <th colspan="2">{{ (t.count === 1 ? 'Total ({n} pizza)' : 'Total ({n} pizzas)') | t: { n: t.count } }}</th>
                 <th class="num">{{ price(t.total) }}</th>
               </tr>
             </tfoot>
@@ -156,14 +159,14 @@ import { OrderCard } from './order-card';
         @if (cart().length) {
           @if (draftEta(); as t) {
             <p class="draft-eta">
-              Ready around <strong>{{ clock(t) }}</strong> ({{ until(t) }}) if sent now
+              {{ 'Ready around' | t }} <strong>{{ clock(t) }}</strong> ({{ until(t) }}) {{ 'if sent now' | t }}
             </p>
           }
         }
 
         <div class="grid2">
           <label>
-            <span>Customer name <span class="muted">(optional)</span></span>
+            <span>{{ 'Customer name' | t }} <span class="muted">{{ '(optional)' | t }}</span></span>
             <input
               name="customer"
               [ngModel]="customer()"
@@ -172,19 +175,19 @@ import { OrderCard } from './order-card';
             />
           </label>
           <label>
-            <span>Order note <span class="muted">(optional)</span></span>
+            <span>{{ 'Order note' | t }} <span class="muted">{{ '(optional)' | t }}</span></span>
             <input
               name="note"
               [(ngModel)]="note"
               maxlength="200"
-              placeholder="Take away, allergy…"
+              [placeholder]="'Take away, allergy…' | t"
             />
           </label>
         </div>
         @for (t of overType(); track t.name) {
           <p class="left-note low">
-            Only <strong>{{ t.left }}</strong> {{ t.name }} left. Remove {{ t.over }} from this
-            order to send it.
+            {{ 'Only' | t }} <strong>{{ t.left }}</strong> {{ '{name} left.' | t: { name: t.name } }}
+            {{ 'Remove {n} from this order to send it.' | t: { n: t.over } }}
           </p>
         }
         <button
@@ -193,37 +196,39 @@ import { OrderCard } from './order-card';
           [disabled]="!cart().length || overLimit() || overType().length"
           (click)="send()"
         >
-          Send to kitchen
+          {{ 'Send to kitchen' | t }}
         </button>
         @if (refused()) {
           <p class="sent refused">
-            Not sent: there weren’t enough pizzas left for this order. Check the order and send it
-            again.
+            {{
+              'Not sent: there weren’t enough pizzas left for this order. Check the order and send it again.'
+                | t
+            }}
           </p>
         } @else if (lastNumber()) {
           <div class="sent">
             <p>
-              Order <strong>#{{ lastNumber() }}</strong> sent. Give the customer this number.
+              {{ 'Order' | t }} <strong>#{{ lastNumber() }}</strong> {{ 'sent. Give the customer this number.' | t }}
               @if (lastTotal()) {
-                <br />To pay: <strong>{{ price(lastTotal()) }}</strong>
+                <br />{{ 'To pay:' | t }} <strong>{{ price(lastTotal()) }}</strong>
               }
               @if (lastEta(); as t) {
-                <br />Estimated ready at <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
+                <br />{{ 'Estimated ready at' | t }} <strong>{{ clock(t) }}</strong> ({{ until(t) }}).
               }
             </p>
             @if (!cart().length) {
               <div class="sent-actions">
                 <button class="btn small" type="button" (click)="showQr.set(!showQr())">
-                  {{ showQr() ? 'Hide QR code' : 'Show QR code' }}
+                  {{ (showQr() ? 'Hide QR code' : 'Show QR code') | t }}
                 </button>
                 <button class="btn small primary" type="button" (click)="nextCustomer()">
-                  Next customer
+                  {{ 'Next customer' | t }}
                 </button>
               </div>
             }
           </div>
         } @else if (lastId()) {
-          <p class="sent pending">Sending order…</p>
+          <p class="sent pending">{{ 'Sending order…' | t }}</p>
         }
         </div>
       </section>
@@ -234,25 +239,25 @@ import { OrderCard } from './order-card';
       <section
         class="open-orders stack"
         role="dialog"
-        aria-label="Open orders"
+        [attr.aria-label]="'Open orders' | t"
         [class.shown]="showOpen()"
         [attr.aria-hidden]="!showOpen()"
         [inert]="!showOpen()"
       >
         <div class="take-head">
-          <h2>Open orders</h2>
+          <h2>{{ 'Open orders' | t }}</h2>
           <button class="btn ghost small" type="button" (click)="showOpen.set(false)">
-            Close ✕
+            {{ 'Close' | t }} ✕
           </button>
         </div>
         @for (order of open(); track order.id) {
           <app-order-card [order]="order" [showStatus]="true">
             @if (order.status === 'new') {
-              <button class="btn danger" type="button" (click)="cancel(order.id)">Cancel</button>
+              <button class="btn danger" type="button" (click)="cancel(order.id)">{{ 'Cancel' | t }}</button>
             }
           </app-order-card>
         } @empty {
-          <p class="muted">No open orders.</p>
+          <p class="muted">{{ 'No open orders.' | t }}</p>
         }
       </section>
     </main>
@@ -417,15 +422,17 @@ export class Take {
     this.cart.update((cart) => cart.map((l, i) => (i === index ? { ...l, note } : l)));
   }
 
+  /** Quick notes go into the note in the language shown (the kitchen reads them). */
   hasNote(note: string, quick: string): boolean {
-    return splitNote(note).some((n) => n.toLowerCase() === quick.toLowerCase());
+    const text = t(quick).toLowerCase();
+    return splitNote(note).some((n) => n.toLowerCase() === text);
   }
 
   toggleNote(index: number, quick: string) {
     const parts = splitNote(this.cart()[index].note);
     const next = this.hasNote(this.cart()[index].note, quick)
-      ? parts.filter((n) => n.toLowerCase() !== quick.toLowerCase())
-      : [...parts, quick];
+      ? parts.filter((n) => n.toLowerCase() !== t(quick).toLowerCase())
+      : [...parts, t(quick)];
     this.setNote(index, next.join(', '));
   }
 
@@ -454,7 +461,7 @@ export class Take {
 
   cancel(id: string) {
     const order = this.queue.orders().find((o) => o.id === id);
-    if (order && confirm(`Cancel order #${order.number}?`))
+    if (order && confirm(t('Cancel order #{n}?', { n: order.number })))
       this.queue.setStatus(order, 'cancelled');
   }
 }

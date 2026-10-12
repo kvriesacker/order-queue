@@ -17,6 +17,8 @@ export interface OrderTrack {
   stage?: DisplayStage | null;
   /** Estimated ready time, cut to the minute, as clocks show it; absent once the order is ready. */
   eta?: number;
+  /** The queue's language, which the follow page speaks (older versions don't send it). */
+  lang?: 'nl' | 'en';
 }
 
 /** Orders stay followable for this long after they're picked up or cancelled. */
@@ -35,6 +37,7 @@ export function orderTrack(state: QueueState, order: Order, eta: number | undefi
     status: order.status,
     stage: displayStage(order),
     eta: eta === undefined ? undefined : Math.floor(eta / 60000) * 60000,
+    lang: state.lang ?? 'nl',
   };
 }
 

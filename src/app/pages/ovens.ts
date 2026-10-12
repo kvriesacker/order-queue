@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { QueueService } from '../queue.service';
+import { T } from '../i18n/i18n';
 
 /**
  * For the oven station: each oven with a switch to mark it out of order. Estimates only
@@ -7,13 +8,14 @@ import { QueueService } from '../queue.service';
  */
 @Component({
   selector: 'app-ovens',
+  imports: [T],
   template: `
     <ul class="ovens-list">
       @for (oven of ovens(); track oven.index) {
         <li class="oven" [class.broken]="oven.out">
-          <strong>Oven {{ oven.index + 1 }}</strong>
+          <strong>{{ 'Oven {n}' | t: { n: oven.index + 1 } }}</strong>
           @if (oven.out) {
-            <span class="oven-state">Out of order</span>
+            <span class="oven-state">{{ 'Out of order' | t }}</span>
           }
           <button
             class="btn small"
@@ -22,13 +24,15 @@ import { QueueService } from '../queue.service';
             type="button"
             (click)="queue.setOvenOut(oven.index, !oven.out)"
           >
-            {{ oven.out ? 'Working again' : 'Mark out of order' }}
+            {{ (oven.out ? 'Working again' : 'Mark out of order') | t }}
           </button>
         </li>
       }
     </ul>
     @if (ovens().length && working() === 0) {
-      <p class="oven-waiting">Every oven is out of order: no ready times until one works again.</p>
+      <p class="oven-waiting">
+        {{ 'Every oven is out of order: no ready times until one works again.' | t }}
+      </p>
     }
   `,
 })

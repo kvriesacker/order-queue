@@ -1,3 +1,4 @@
+import { dateLocale, t } from './i18n/i18n';
 import { NewOrderItem, Order, QueueState, Timing, applyAction } from './models';
 
 const MINUTE = 60000;
@@ -161,11 +162,11 @@ export function pizzaSummary(order: Order): string {
 
 /** "18:42" for a timestamp. */
 export function clockTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 /** "12 min" until a timestamp, or "any minute" when it's (nearly) due. */
 export function minutesUntil(ts: number, now: number): string {
   const minutes = Math.round((ts - now) / MINUTE);
-  return minutes <= 1 ? 'any minute' : `${minutes} min`;
+  return minutes <= 1 ? t('any minute') : t('{n} min', { n: minutes });
 }

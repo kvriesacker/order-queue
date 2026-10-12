@@ -6,66 +6,66 @@ import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
 import { InstallApp } from './install-app';
+import { T, dateLocale, lang, queueLang, t } from '../i18n/i18n';
+import { LangSwitch } from '../i18n/lang-switch';
 
 @Component({
   selector: 'app-home',
-  imports: [FormsModule, MenuEditor, TimingEditor, InstallApp],
+  imports: [FormsModule, MenuEditor, TimingEditor, InstallApp, T, LangSwitch],
   template: `
     <main class="home">
-      <h1 class="brand"><span aria-hidden="true">🍕</span> Pizza queue</h1>
-      <p class="lead">Take orders, bake them and call out the numbers, together on any device.</p>
+      <div class="home-lang"><app-lang-switch /></div>
+      <h1 class="brand"><span aria-hidden="true">🍕</span> {{ 'Pizza queue' | t }}</h1>
+      <p class="lead">{{ 'Take orders, bake them and call out the numbers, together on any device.' | t }}</p>
       <app-install />
 
       <form class="card stack" (ngSubmit)="create()">
-        <h2>Start a new queue</h2>
+        <h2>{{ 'Start a new queue' | t }}</h2>
         <label>
-          Shop name
+          {{ 'Shop name' | t }}
           <input name="name" [(ngModel)]="name" placeholder="Pizzeria Napoli" maxlength="40" />
         </label>
         <div class="stack tight">
-          <strong>Pizzas on the menu</strong>
-          <span class="hint">Untick what you don’t sell and pick a color for each pizza.</span>
+          <strong>{{ 'Pizzas on the menu' | t }}</strong>
+          <span class="hint">{{ 'Untick what you don’t sell and pick a color for each pizza.' | t }}</span>
         </div>
         <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
-        <strong>Pizzas and ready times</strong>
+        <strong>{{ 'Pizzas and ready times' | t }}</strong>
         <app-timing-editor [(timing)]="timing" />
         @if (createError()) {
-          <p class="error">{{ createError() }}</p>
+          <p class="error">{{ createError() | t }}</p>
         }
-        <button class="btn primary big" type="submit">Start queue</button>
-        <p class="hint">
-          Keep this browser tab open while the shop is running: it holds the orders.
-        </p>
+        <button class="btn primary big" type="submit">{{ 'Start queue' | t }}</button>
       </form>
 
       <form class="card stack" (ngSubmit)="join()">
-        <h2>Join a queue</h2>
+        <h2>{{ 'Join a queue' | t }}</h2>
         <label>
-          Link or code
-          <input name="code" [(ngModel)]="code" placeholder="https://…#/q/abc123 or abc123" />
+          {{ 'Link or code' | t }}
+          <input name="code" [(ngModel)]="code" [placeholder]="'https://…#/q/abc123 or abc123' | t" />
         </label>
-        <button class="btn big" type="submit" [disabled]="!code.trim()">Join</button>
+        <button class="btn big" type="submit" [disabled]="!code.trim()">{{ 'Join' | t }}</button>
         @if (joinError()) {
-          <p class="error">{{ joinError() }}</p>
+          <p class="error">{{ joinError() | t }}</p>
         }
       </form>
 
       @if (mine().length) {
         <section class="card stack">
-          <h2>Your queues</h2>
+          <h2>{{ 'Your queues' | t }}</h2>
           @for (q of mine(); track q.id) {
             <div class="queue-row">
               <button class="btn row-btn" type="button" (click)="go(q.id)">
                 <span>{{ q.name }}</span>
-                <span class="muted">{{ lastUsed(q) }} · {{ q.orders.length }} {{ q.orders.length === 1 ? 'order' : 'orders' }}</span>
+                <span class="muted">{{ lastUsed(q) }} · {{ (q.orders.length === 1 ? '{n} order' : '{n} orders') | t: { n: q.orders.length } }}</span>
               </button>
               <button
                 class="btn ghost small"
                 type="button"
-                [attr.aria-label]="'Remove ' + q.name"
+                [attr.aria-label]="'Remove {name}' | t: { name: q.name }"
                 (click)="remove(q)"
               >
-                Remove
+                {{ 'Remove' | t }}
               </button>
             </div>
           }
@@ -97,7 +97,7 @@ export class Home {
     } catch {
       // Not remembering the menu is fine.
     }
-    this.go(this.queue.create(this.name, this.menu(), this.timing()));
+    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang()));
   }
 
   join() {
@@ -112,13 +112,16 @@ export class Home {
   /** When the queue last had an order, so old ones are easy to spot. */
   lastUsed(q: QueueState): string {
     const last = Math.max(0, ...q.orders.map((o) => o.updatedAt ?? o.createdAt));
-    if (!last) return 'no orders yet';
-    return new Date(last).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    if (!last) return t('no orders yet');
+    return new Date(last).toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   remove(q: QueueState) {
     const ok = confirm(
-      `Remove “${q.name}” from this device? Its orders and statistics on this device are deleted. Download the statistics first if you still need them.`,
+      t(
+        'Remove “{name}” from this device? Its orders and statistics on this device are deleted. Download the statistics first if you still need them.',
+        { name: q.name },
+      ),
     );
     if (!ok) return;
     this.queue.forget(q.id);

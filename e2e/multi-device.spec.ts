@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { ENGLISH } from '../playwright.config';
 
 // Several devices (each its own browser, as on separate phones and tablets) working on one
 // queue through the local Firebase emulator started by the Playwright config.
@@ -8,7 +9,7 @@ test.setTimeout(120_000);
 test.beforeEach(({}, info) => test.skip(info.project.name === 'phone', 'Runs on desktop only'));
 
 async function device(browser: Browser, path = '') {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ storageState: ENGLISH });
   const page = await context.newPage();
   page.on('dialog', (d) => d.accept());
   if (path) await page.goto(`/${EMULATOR}#${path}`);

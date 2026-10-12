@@ -72,6 +72,8 @@ export interface QueueState {
   hostEpoch: number;
   /** Identifies the device hosting this epoch (a random id it keeps with its saved queue). */
   hostId: string;
+  /** Language for devices that join and for customer screens; Dutch when missing. */
+  lang?: 'nl' | 'en';
 }
 
 /**
@@ -223,6 +225,8 @@ export type QueueAction =
   | { type: 'pizza'; id: string; item: number; unit: number; status: PizzaStatus }
   | { type: 'menu'; menu: MenuItem[] }
   | { type: 'timing'; timing: Timing }
+  /** The default language for devices that join and for customer screens. */
+  | { type: 'lang'; lang: 'nl' | 'en' }
   /** The oven station marks one oven out of order, or working again. */
   | { type: 'oven'; index: number; out: boolean }
   /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
@@ -336,6 +340,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
         return { ...o, items, status, bakedAt, updatedAt: now };
       });
     }
+    case 'lang':
+      return action.lang === 'nl' || action.lang === 'en' ? { ...state, lang: action.lang } : state;
     case 'timing': {
       const minutes = (n: unknown, fallback: number) =>
         typeof n === 'number' && n > 0 && n <= 180 ? Math.round(n * 10) / 10 : fallback;
@@ -484,9 +490,11 @@ export function normalizeState(state: QueueState): QueueState {
     : [];
   const hostEpoch = state.hostEpoch >= 0 ? state.hostEpoch : 0;
   const hostId = typeof state.hostId === 'string' ? state.hostId : '';
+  // Queues from before languages speak Dutch, the default.
+  const lang = state.lang === 'en' ? 'en' : 'nl';
   return {
     id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, ovensOut,
-    hostEpoch, hostId,
+    hostEpoch, hostId, lang,
   };
 }
 

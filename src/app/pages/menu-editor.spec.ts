@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MenuItem } from '../models';
 import { MenuEditor } from './menu-editor';
+import { deviceLang } from '../i18n/i18n';
 
 @Component({
   imports: [MenuEditor],
@@ -15,6 +16,8 @@ class Host {
 }
 
 async function setup() {
+  // The labels below are the English ones.
+  deviceLang.set('en');
   const fixture = TestBed.createComponent(Host);
   await fixture.whenStable();
   const el: HTMLElement = fixture.nativeElement;

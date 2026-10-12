@@ -1,40 +1,43 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { QueueService } from '../queue.service';
+import { T, t } from '../i18n/i18n';
+import { LangSwitch } from '../i18n/lang-switch';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, T, LangSwitch],
   template: `
     <header class="topbar">
       <a class="brand small" routerLink="/"
-        ><span aria-hidden="true">🍕</span> {{ queue.state()?.name ?? 'Pizza queue' }}</a
+        ><span aria-hidden="true">🍕</span> {{ queue.state()?.name ?? ('Pizza queue' | t) }}</a
       >
       <nav class="tabs">
-        <a routerLink="take" routerLinkActive="active">Orders</a>
-        <a routerLink="kitchen" routerLinkActive="active">Kitchen</a>
-        <a routerLink="oven" routerLinkActive="active">Oven</a>
-        <a routerLink="counter" routerLinkActive="active">Counter</a>
-        <a routerLink="stats" routerLinkActive="active">Stats</a>
-        <a routerLink="menu" routerLinkActive="active">Settings</a>
+        <a routerLink="take" routerLinkActive="active">{{ 'Orders' | t }}</a>
+        <a routerLink="kitchen" routerLinkActive="active">{{ 'Kitchen' | t }}</a>
+        <a routerLink="oven" routerLinkActive="active">{{ 'Oven' | t }}</a>
+        <a routerLink="counter" routerLinkActive="active">{{ 'Counter' | t }}</a>
+        <a routerLink="stats" routerLinkActive="active">{{ 'Stats' | t }}</a>
+        <a routerLink="menu" routerLinkActive="active">{{ 'Settings' | t }}</a>
       </nav>
       <div class="topbar-end">
         @if (queue.pizzasLeft(); as left) {
-          <span class="pill left" [class.low]="left <= 10">{{ left }} {{ left === 1 ? 'pizza' : 'pizzas' }} left</span>
+          <span class="pill left" [class.low]="left <= 10">{{ (left === 1 ? '{n} pizza left' : '{n} pizzas left') | t: { n: left } }}</span>
         } @else if (queue.pizzasLeft() === 0) {
-          <span class="pill left low">Sold out</span>
+          <span class="pill left low">{{ 'Sold out' | t }}</span>
         }
-        <span class="pill" [class]="pill().kind">{{ pill().text }}</span>
+        <span class="pill" [class]="pill().kind">{{ pill().text | t }}</span>
         <button class="btn" type="button" (click)="share()">
-          {{ copied() ? 'Link copied' : 'Share link' }}
+          {{ (copied() ? 'Link copied' : 'Share link') | t }}
         </button>
+        <app-lang-switch />
       </div>
     </header>
     @if (queue.connection() === 'offline') {
-      <p class="banner">No internet connection. Changes are sent when it’s back.</p>
+      <p class="banner">{{ 'No internet connection. Changes are sent when it’s back.' | t }}</p>
     } @else if (queue.connection() === 'no-backend') {
       <p class="banner">
-        This app isn’t connected to its Firebase project yet, so changes stay on this device.
+        {{ 'This app isn’t connected to its Firebase project yet, so changes stay on this device.' | t }}
       </p>
     }
     <router-outlet />
@@ -64,7 +67,7 @@ export class Shell {
 
   async share() {
     const link = this.queue.shareLink();
-    const data = { title: 'Pizza queue', text: 'Join our pizza order queue', url: link };
+    const data = { title: t('Pizza queue'), text: t('Join our pizza order queue'), url: link };
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
       try {
         await navigator.share(data);
@@ -76,7 +79,7 @@ export class Shell {
     try {
       await navigator.clipboard.writeText(link);
     } catch {
-      prompt('Copy this link', link);
+      prompt(t('Copy this link'), link);
       return;
     }
     this.copied.set(true);

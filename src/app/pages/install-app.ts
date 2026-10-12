@@ -1,4 +1,5 @@
 import { Component, signal } from '@angular/core';
+import { T } from '../i18n/i18n';
 
 /** The browser's install offer, kept until the user presses the button. */
 interface InstallPrompt extends Event {
@@ -24,15 +25,17 @@ addEventListener('appinstalled', () => {
  */
 @Component({
   selector: 'app-install',
+  imports: [T],
   template: `
     @if (canInstall()) {
       <button class="btn install-btn" type="button" (click)="install()">
-        Install app on this device
+        {{ 'Install app on this device' | t }}
       </button>
     } @else if (ios && !installed) {
       <p class="hint install-hint">
-        To install this app on your iPhone or iPad: tap <strong>Share</strong>, then
-        <strong>Add to Home Screen</strong>.
+        {{ 'To install this app on your iPhone or iPad: tap' | t }}
+        <strong>{{ 'Share' | t }}</strong>{{ ', then' | t }}
+        <strong>{{ 'Add to Home Screen' | t }}</strong>.
       </p>
     }
   `,
