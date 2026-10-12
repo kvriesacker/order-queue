@@ -1,8 +1,8 @@
 const encoder = new TextEncoder();
 
 /**
- * End-to-end encryption for one queue. The key and the broker topic are both derived
- * from the queue id, which only people with the link know.
+ * End-to-end encryption for one queue. The key and the document id are both derived
+ * from the queue id, which only people with the link know, and the queue password.
  */
 export class QueueCrypto {
   private constructor(
@@ -10,7 +10,27 @@ export class QueueCrypto {
     private key: CryptoKey,
   ) {}
 
-  static async forQueue(id: string): Promise<QueueCrypto> {
+  /**
+   * With a password, the key and the document id come from the id and the password together
+   * (slowly, so passwords can't be guessed quickly): the link alone then can't find, read or
+   * change the queue.
+   */
+  static async forQueue(id: string, password?: string): Promise<QueueCrypto> {
+    if (password) {
+      const base = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [
+        'deriveBits',
+      ]);
+      const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(`pizza-queue-lock:${id}`), iterations: 200_000 },
+        base,
+        512,
+      );
+      const key = await crypto.subtle.importKey('raw', bits.slice(32), 'AES-GCM', false, [
+        'encrypt',
+        'decrypt',
+      ]);
+      return new QueueCrypto(`pizza-queue/v2/${toHex(bits.slice(0, 16))}`, key);
+    }
     const topicHash = await sha256(`pizza-queue-topic:${id}`);
     const keyBytes = await sha256(`pizza-queue-key:${id}`);
     const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, [

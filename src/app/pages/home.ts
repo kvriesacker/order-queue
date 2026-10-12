@@ -32,6 +32,18 @@ import { LangSwitch } from '../i18n/lang-switch';
         <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
         <strong>{{ 'Pizzas and ready times' | t }}</strong>
         <app-timing-editor [(timing)]="timing" />
+        <label>
+          {{ 'Queue password' | t }}
+          <input
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            [(ngModel)]="password"
+            minlength="4"
+            maxlength="60"
+          />
+          <span class="hint">{{ 'Your team needs this password and the link to join. Customers never need it.' | t }}</span>
+        </label>
         @if (createError()) {
           <p class="error">{{ createError() | t }}</p>
         }
@@ -79,6 +91,7 @@ export class Home {
   private router = inject(Router);
 
   name = '';
+  password = '';
   code = '';
   joinError = signal('');
   createError = signal('');
@@ -91,13 +104,17 @@ export class Home {
       this.createError.set('Tick at least one pizza.');
       return;
     }
+    if (this.password.trim().length < 4) {
+      this.createError.set('Choose a queue password of at least 4 characters.');
+      return;
+    }
     try {
       localStorage.setItem(LAST_MENU_KEY, JSON.stringify(this.menu()));
       localStorage.setItem(LAST_TIMING_KEY, JSON.stringify(this.timing()));
     } catch {
       // Not remembering the menu is fine.
     }
-    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang()));
+    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang(), this.password.trim()));
   }
 
   join() {

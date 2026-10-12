@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // These devices start without a language picked, as a new phone or tablet would.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -7,6 +8,7 @@ const START = '?emulator=127.0.0.1#/';
 test('the app speaks Dutch by default, and each device can switch', async ({ page }) => {
   await page.goto(START);
   await expect(page.getByRole('button', { name: 'Wachtrij starten' })).toBeVisible();
+  await page.getByLabel('Wachtwoord van de wachtrij').fill(PASSWORD);
   await page.getByRole('button', { name: 'Wachtrij starten' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   const nav = page.getByRole('navigation');
@@ -25,6 +27,7 @@ test('the app speaks Dutch by default, and each device can switch', async ({ pag
 
 test("devices that join and customer screens follow the queue's language from Settings", async ({ page, browser }) => {
   await page.goto(START);
+  await page.getByLabel('Wachtwoord van de wachtrij').fill(PASSWORD);
   await page.getByRole('button', { name: 'Wachtrij starten' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   const id = page.url().split('/q/')[1];
@@ -41,6 +44,9 @@ test("devices that join and customer screens follow the queue's language from Se
   // A new device joining is in English.
   const other = await (await browser.newContext()).newPage();
   await other.goto(`/?emulator=127.0.0.1#/q/${id}/kitchen`);
+  // Before it has the password it doesn't know the queue's language yet.
+  await other.getByLabel('Wachtwoord van de wachtrij').fill(PASSWORD);
+  await other.getByRole('button', { name: 'Deelnemen' }).click();
   await expect(other.getByRole('navigation').getByRole('link', { name: 'Kitchen', exact: true })).toBeVisible({
     timeout: 20_000,
   });

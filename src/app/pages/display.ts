@@ -16,10 +16,14 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
  * Customer-facing screen: orders in four blocks (ordered, being prepared, baking, ready), each
  * with the customer's name and pizzas, and the estimated time until it's ready.
  */
+import { Unlock } from './unlock';
 @Component({
   selector: 'app-display',
-  imports: [RouterLink, T],
+  imports: [Unlock, RouterLink, T],
   template: `
+    @if (queue.lock() !== 'open') {
+      <app-unlock />
+    } @else {
     <main class="display" (dblclick)="fullscreen()">
       @for (col of columns(); track col.stage) {
         <section class="display-col" [class]="col.stage">
@@ -68,6 +72,7 @@ const COLUMNS: { stage: DisplayStage; title: string; empty: string }[] = [
         </span>
       </footer>
     </main>
+    }
   `,
 })
 export class Display {

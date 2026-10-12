@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -43,6 +44,7 @@ async function finish(page: Page, number: number) {
 
 test('the customer screen shows orders in four blocks, ready ones in green', async ({ page }) => {
   await page.goto(START);
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   const queue = page.url();

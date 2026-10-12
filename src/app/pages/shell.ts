@@ -17,10 +17,14 @@ import { T, t } from '../i18n/i18n';
 import { LangSwitch } from '../i18n/lang-switch';
 import { focusMode } from '../focus';
 
+import { Unlock } from './unlock';
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, T, LangSwitch],
+  imports: [Unlock, RouterOutlet, RouterLink, RouterLinkActive, T, LangSwitch],
   template: `
+    @if (queue.lock() !== 'open') {
+      <app-unlock />
+    } @else {
     @if (!focus()) {
     <header class="topbar">
       <a class="brand small" routerLink="/"
@@ -62,6 +66,18 @@ import { focusMode } from '../focus';
         <p class="muted">{{ 'Scan this code with another phone or tablet to work along in this queue.' | t }}</p>
         <div class="qr share-qr" [innerHTML]="qr()"></div>
         <p class="share-link">{{ link() }}</p>
+        @if (queue.queuePassword(); as password) {
+          <p class="share-password">
+            {{ 'They also need the queue password:' | t }}
+            @if (showPassword()) {
+              <strong>{{ password }}</strong>
+            } @else {
+              <button class="btn ghost small" type="button" (click)="showPassword.set(true)">
+                {{ 'Show password' | t }}
+              </button>
+            }
+          </p>
+        }
         <div class="share-actions">
           <button class="btn primary big" type="button" (click)="copy()">
             {{ (copied() ? '✓ Link copied' : 'Copy link') | t }}
@@ -73,6 +89,7 @@ import { focusMode } from '../focus';
         </div>
       }
     </dialog>
+    }
   `,
 })
 export class Shell {
@@ -80,6 +97,7 @@ export class Shell {
   readonly id = input.required<string>();
   protected copied = signal(false);
   protected sharing = signal(false);
+  protected showPassword = signal(false);
   private shareDialog = viewChild.required<ElementRef<HTMLDialogElement>>('shareDialog');
   protected canShare = typeof navigator !== 'undefined' && !!navigator.share;
   protected link = computed(() => this.queue.shareLink(this.queue.state()?.id));
@@ -110,6 +128,7 @@ export class Shell {
   /** Shows the queue link as a QR code for other staff to scan, with a button to copy it. */
   protected openShare() {
     this.copied.set(false);
+    this.showPassword.set(false);
     this.sharing.set(true);
     this.shareDialog().nativeElement.showModal();
   }

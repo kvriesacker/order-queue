@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -9,6 +10,7 @@ function tab(page: Page, name: string) {
 
 test('the customer screen follows the order as it is taken', async ({ page, context }) => {
   await page.goto(START);
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   await tab(page, 'Orders').click();
@@ -69,6 +71,7 @@ test('the customer screen follows the order as it is taken', async ({ page, cont
 
 test('the QR code shown while ordering is for the order that gets sent', async ({ page, context }) => {
   await page.goto(START);
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await tab(page, 'Orders').click();
   const queueId = page.url().split('/q/')[1].split('/')[0];
@@ -117,6 +120,7 @@ test('the customer screen lists the pizzas and warns when they are almost sold o
   await page.getByLabel(/Pizzas available in total/).fill('8');
   await page.getByLabel('Maximum Margherita').fill('2');
   await page.getByLabel('Maximum Funghi').fill('10');
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await tab(page, 'Orders').click();
   const [screen] = await Promise.all([

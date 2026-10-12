@@ -63,7 +63,8 @@ export function t(text: string, params?: Record<string, string | number>): strin
  * whatever this device was switched to. Call from a component's constructor.
  */
 export function speakToCustomers(source: () => Lang | null | undefined): void {
-  const ref = effect(() => customerLang.set(source() ?? DEFAULT_LANG));
+  // Until the queue is there (or while it asks staff for its password), the device's own.
+  const ref = effect(() => customerLang.set(source() ?? null));
   inject(DestroyRef).onDestroy(() => {
     ref.destroy();
     customerLang.set(null);

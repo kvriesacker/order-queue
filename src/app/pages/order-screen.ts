@@ -21,10 +21,14 @@ export const ALMOST_GONE = 5;
  * "Next customer". While waiting and ordering, the pizzas are listed with the ones (or the
  * total) almost sold out marked, so customers know before they ask. Made for full screen.
  */
+import { Unlock } from './unlock';
 @Component({
   selector: 'app-order-screen',
-  imports: [RouterLink, T],
+  imports: [Unlock, RouterLink, T],
   template: `
+    @if (queue.lock() !== 'open') {
+      <app-unlock />
+    } @else {
     <main class="order-screen" (dblclick)="fullscreen()">
       <p class="os-shop">{{ queue.state()?.name }}</p>
       @if (building(); as b) {
@@ -133,6 +137,7 @@ export const ALMOST_GONE = 5;
         <a routerLink="../take">{{ 'Back' | t }}</a>
       </footer>
     </main>
+    }
   `,
 })
 export class OrderScreen {

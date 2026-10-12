@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -17,6 +18,7 @@ test('prices: a general price, a price per pizza, and totals for order taker and
   await page.getByLabel('Price Calzone').blur();
   // The general price shows where a pizza has no price of its own.
   await expect(page.getByLabel('Price Margherita')).toHaveAttribute('placeholder', '€ 9.5');
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
 
@@ -71,6 +73,7 @@ test('prices: a general price, a price per pizza, and totals for order taker and
 test('a price of 0 hides prices', async ({ page }) => {
   await page.goto(START);
   await page.getByLabel('Price per pizza').fill('0');
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await tab(page, 'Orders').click();
   await page.locator('.menu-item', { hasText: 'Margherita' }).click();

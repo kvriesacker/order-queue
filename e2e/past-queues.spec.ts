@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -7,6 +8,7 @@ test('past queues can be removed from the start page', async ({ page }) => {
   for (const name of ['Friday market', 'Saturday party']) {
     await page.goto(START);
     await page.getByLabel('Shop name').fill(name);
+    await page.getByLabel('Queue password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Start queue' }).click();
     await expect(page).toHaveURL(/#\/q\/\w+$/);
   }

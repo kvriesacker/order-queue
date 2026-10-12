@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -24,6 +25,7 @@ test('the app can be installed and opens without a connection', async ({ page, c
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Start a new queue' })).toBeVisible();
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   await expect(page.getByRole('navigation').getByRole('link', { name: 'Orders', exact: true })).toBeVisible();

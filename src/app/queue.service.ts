@@ -5,6 +5,7 @@ import {
   FirestoreError,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -38,6 +39,12 @@ import { DEFAULT_LANG, Lang, queueLang, t } from './i18n/i18n';
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline' | 'no-backend';
 
 /**
+ * Whether this device may open the queue: `ask` and `wrong` wait for the queue password,
+ * `checking` while finding out whether the queue has one or the password is right.
+ */
+export type LockState = 'open' | 'checking' | 'ask' | 'wrong';
+
+/**
  * What an order taker is doing right now, for the screen facing the customer: the order
  * being taken (with the id it will get, so its QR code works before it's sent) and the
  * order just sent.
@@ -57,6 +64,8 @@ export interface OrderDraft {
   at: number;
 }
 
+/** The queue password on each staff device that started or joined the queue. */
+const PASSWORD_KEY = (id: string) => `pizza-queue:password:${id}`;
 /** Each staff device's copy of the queue, so it shows at once and without internet. */
 const COPY_KEY = (id: string) => `pizza-queue:copy:${id}`;
 /** Saved by the earlier version, where the device that started a queue held it. */
@@ -87,12 +96,14 @@ const TRACK_REFRESH_MS = 60000;
  * different numbers and the pizza limit holds, and no device has to stay online for the
  * others. Changes made without internet wait on the device and are sent when it's back.
  *
- * Everything is end-to-end encrypted with a key derived from the queue id in the link, so
- * Firebase only sees a hashed document id and ciphertext.
+ * Everything is end-to-end encrypted with a key derived from the queue id in the link and the
+ * queue password, so Firebase only sees a hashed document id and ciphertext, and someone with
+ * only the link can't find the queue.
  */
 @Injectable({ providedIn: 'root' })
 export class QueueService {
   readonly connection = signal<ConnectionState>('idle');
+  readonly lock = signal<LockState>('open');
   /** Finished orders no longer in the live queue, so statistics cover the whole event. */
   readonly archive = signal<Order[]>([]);
   /** The latest draft from each order point, for the customer's order screen. */
@@ -150,6 +161,7 @@ export class QueueService {
   });
 
   private queueId = '';
+  private password = '';
   private crypto: QueueCrypto | null = null;
   private db: Firestore | null = null;
   private readonly deviceId = randomId(12);
@@ -180,8 +192,11 @@ export class QueueService {
     setInterval(() => this.refreshTracking(), TRACK_REFRESH_MS);
   }
 
-  /** Creates a new queue and returns its id. It's saved online when it opens. */
-  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang = DEFAULT_LANG): string {
+  /**
+   * Creates a new queue and returns its id. It's saved online when it opens. Staff joining
+   * it need the password as well as the link.
+   */
+  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang, password: string): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
@@ -198,6 +213,8 @@ export class QueueService {
       lang,
     };
     localStorage.setItem(COPY_KEY(id), JSON.stringify(state));
+    localStorage.setItem(PASSWORD_KEY(id), password);
+    this.saveDoor(id, password);
     return id;
   }
 
@@ -207,17 +224,116 @@ export class QueueService {
    */
   forget(id: string): void {
     if (id === this.queueId) this.close();
-    for (const key of [OLD_HOST_KEY(id), COPY_KEY(id), ARCHIVE_KEY(id), ...pendingKeys(id)]) {
+    for (const key of [OLD_HOST_KEY(id), COPY_KEY(id), ARCHIVE_KEY(id), PASSWORD_KEY(id), ...pendingKeys(id)]) {
       localStorage.removeItem(key);
     }
   }
 
-  /** Opens a queue: shows this device's copy at once and follows the one online. */
+  /**
+   * Opens a queue: shows this device's copy at once and follows the one online. A queue with
+   * a password waits for it (see `unlock`) unless this device already knows it.
+   */
   async open(id: string): Promise<void> {
     if (id === this.queueId) return;
     this.close();
     this.queueId = id;
-    const crypto = await QueueCrypto.forQueue(id);
+    const password = savedPassword(id);
+    // A queue this device knew before passwords existed has none; skip asking online.
+    if (password || this.loadCopy(id)) return this.start(id, password);
+    this.lock.set('checking');
+    const door = await this.door(id);
+    if (id !== this.queueId) return;
+    if (door === undefined) return; // No connection: tried again when it's back.
+    if (door) this.lock.set('ask');
+    else this.start(id, '');
+  }
+
+  /** Tries a queue password; opens the queue when it's right. */
+  async unlock(password: string): Promise<void> {
+    const id = this.queueId;
+    if (!id || !password) return;
+    this.lock.set('checking');
+    const door = await this.door(id);
+    if (id !== this.queueId) return;
+    if (door === undefined) {
+      this.lock.set('ask');
+      return;
+    }
+    const crypto = await QueueCrypto.forQueue(id, password);
+    const right = door ? (await crypto.decrypt(door)) !== null : true;
+    if (id !== this.queueId) return;
+    if (!right) {
+      this.lock.set('wrong');
+      return;
+    }
+    try {
+      localStorage.setItem(PASSWORD_KEY(id), password);
+    } catch {
+      // Private mode: asked again next time.
+    }
+    this.start(id, door ? password : '');
+  }
+
+  /**
+   * The queue's door: proof of its password, which anyone with the link can read but nobody
+   * can change. Null for a queue without a password, undefined when there's no connection.
+   */
+  private async door(id: string): Promise<string | null | undefined> {
+    let db: Firestore;
+    try {
+      db = await firestore();
+    } catch {
+      return null; // Without Firebase everything stays on this device.
+    }
+    try {
+      const snap = await getDoc(doc(db, 'doors', docId(await QueueCrypto.forQueue(id))));
+      const data = snap.get('data');
+      return typeof data === 'string' ? data : null;
+    } catch {
+      this.connection.set('offline');
+      const retry = () => id === this.queueId && this.lock() !== 'open' && this.reopen(id);
+      window.addEventListener('online', retry, { once: true });
+      return undefined;
+    }
+  }
+
+  /** The password of the open queue, as this device knows it ('' without one). */
+  queuePassword(): string {
+    return this.password;
+  }
+
+  private async recheckDoor(id: string, tries = 5): Promise<void> {
+    const door = await this.door(id);
+    if (id !== this.queueId || this.confirmed()) return;
+    if (door) this.reopen(id);
+    else if (tries > 1) setTimeout(() => this.recheckDoor(id, tries - 1), 2000);
+  }
+
+  /**
+   * Saves a queue's door unless it's there, so staff joining are asked for the password. Apart
+   * from the queue itself, which is saved even when this fails.
+   */
+  private async saveDoor(id: string, password: string): Promise<void> {
+    try {
+      const db = await firestore();
+      const ref = doc(db, 'doors', docId(await QueueCrypto.forQueue(id)));
+      if ((await getDoc(ref)).exists()) return;
+      const crypto = await QueueCrypto.forQueue(id, password);
+      await setDoc(ref, { data: await crypto.encrypt({ door: 1 }), at: serverTimestamp() });
+    } catch {
+      // Offline: saved when the queue opens online again.
+    }
+  }
+
+  private reopen(id: string): void {
+    this.queueId = '';
+    this.open(id);
+  }
+
+  private async start(id: string, password: string): Promise<void> {
+    this.lock.set('open');
+    this.password = password;
+    const crypto = await QueueCrypto.forQueue(id, password);
     const left = await this.adoptPending(id);
     if (id !== this.queueId) return;
     this.crypto = crypto;
@@ -370,6 +486,8 @@ export class QueueService {
     this.draftTimers.forEach((t) => clearTimeout(t));
     this.draftTimers.clear();
     this.queueId = '';
+    this.password = '';
+    this.lock.set('open');
     this.crypto = null;
     this.confirmed.set(null);
     this.archive.set([]);
@@ -387,6 +505,7 @@ export class QueueService {
     return doc(this.db!, 'queues', docId(this.crypto!));
   }
 
+
   /** Handles incoming changes one at a time, in order; one going wrong doesn't stop the rest. */
   private receive(handle: () => Promise<void>): void {
     this.inbox = this.inbox.then(handle).catch((e) => console.error(e));
@@ -401,6 +520,9 @@ export class QueueService {
       // Not online yet: a queue just started on this device (or held by the earlier
       // version) is saved there now.
       if (fromServer && this.confirmed()) this.flush(true);
+      // Nothing here without a password: maybe the queue has one after all (its door was
+      // saved just after this device looked).
+      else if (fromServer && !this.password) this.recheckDoor(this.queueId);
       return;
     }
     const data = snap.get('data');
@@ -426,7 +548,11 @@ export class QueueService {
     clearTimeout(this.retryTimer);
     const crypto = this.crypto;
     try {
-      if (upload) await this.commit(null);
+      if (upload) {
+        // The door first: once the queue is online, staff joining are asked for the password.
+        if (this.password) await this.saveDoor(this.queueId, this.password);
+        await this.commit(null);
+      }
       while (crypto === this.crypto && this.pending().length) {
         const action = this.pending()[0];
         await this.commit(action);
@@ -625,6 +751,14 @@ function pendingKeys(id: string): string[] {
     return Object.keys(localStorage).filter((k) => k.startsWith(prefix));
   } catch {
     return [];
+  }
+}
+
+function savedPassword(id: string): string {
+  try {
+    return localStorage.getItem(PASSWORD_KEY(id)) ?? '';
+  } catch {
+    return '';
   }
 }
 

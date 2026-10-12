@@ -1953,3 +1953,19 @@ app-install {
   flex-direction: column;
   gap: 0.5rem;
 }
+
+/* Queue password, asked when joining */
+.unlock {
+  max-width: 26rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+.unlock h1 {
+  font-size: 1.3rem;
+}
+.unlock p {
+  margin: 0;
+}
+.share-password {
+  font-size: 0.9rem;
+}

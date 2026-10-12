@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -22,6 +23,7 @@ test('a maximum set at the start stops orders of that pizza', async ({ page }) =
   // The extra field still fits on a phone.
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
 
@@ -45,6 +47,7 @@ test('the kitchen counts its ingredients, and ordered pizzas count as still to m
   page,
 }) => {
   await page.goto(START);
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
   await tab(page, 'Orders').click();

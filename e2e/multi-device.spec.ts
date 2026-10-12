@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { ENGLISH } from '../playwright.config';
 import { savedTrack } from './track-doc';
+import { PASSWORD } from './password';
 
 // Several devices (each its own browser, as on separate phones and tablets) working on one
 // queue through the local Firebase emulator started by the Playwright config.
@@ -14,12 +15,18 @@ async function device(browser: Browser, path = '') {
   const page = await context.newPage();
   page.on('dialog', (d) => d.accept());
   if (path) await page.goto(`/${EMULATOR}#${path}`);
+  // Staff joining a queue give its password once.
+  if (path.startsWith('/q/')) {
+    await page.getByLabel('Queue password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Join' }).click();
+  }
   return page;
 }
 
 async function startQueue(browser: Browser, maxPizzas = 0) {
   const first = await device(browser, '/');
   if (maxPizzas) await first.getByLabel(/Pizzas available in total/).fill(String(maxPizzas));
+  await first.getByLabel('Queue password').fill(PASSWORD);
   await first.getByRole('button', { name: 'Start queue' }).click();
   await expect(first).toHaveURL(/#\/q\/\w+$/);
   await expect(first.getByText('Connected', { exact: true })).toBeVisible({ timeout: 20_000 });

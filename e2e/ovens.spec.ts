@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PASSWORD } from './password';
 
 // The local Firebase emulator started by the Playwright config, never the real project.
 const START = '?emulator=127.0.0.1#/';
@@ -12,6 +13,7 @@ test('the oven station marks an oven out of order, and the estimates follow', as
   // Two ovens of one pizza each.
   await page.getByLabel('Ovens').fill('2');
   await page.getByLabel('Pizzas per oven').fill('1');
+  await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
 
