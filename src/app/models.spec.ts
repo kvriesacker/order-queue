@@ -34,6 +34,21 @@ describe('applyAction', () => {
     expect(s.nextNumber).toBe(3);
   });
 
+  it('lets the next order number jump, for a new roll of printed tickets', () => {
+    let s = applyAction(applyAction(empty, add('a')), add('b'));
+    s = applyAction(s, { type: 'next-number', number: 100 });
+    s = applyAction(s, add('c'));
+    expect(s.orders.map((o) => o.number)).toEqual([1, 2, 100]);
+    expect(s.nextNumber).toBe(101);
+    // Never a number an order in the shop still has, nor a broken number.
+    for (const number of [2, 0, -5, 1.5, 1_000_000]) {
+      expect(applyAction(s, { type: 'next-number', number }).nextNumber).toBe(101);
+    }
+    // Once that order is picked up, its number may be used again.
+    s = applyAction(s, { type: 'status', id: 'b', status: 'collected' });
+    expect(applyAction(s, { type: 'next-number', number: 2 }).nextNumber).toBe(2);
+  });
+
   it('ignores a duplicate add, such as a resent action', () => {
     const once = applyAction(empty, add('a'));
     expect(applyAction(once, add('a'))).toBe(once);

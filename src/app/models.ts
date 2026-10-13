@@ -273,7 +273,21 @@ export type QueueAction =
   /** The oven station puts one prepared pizza in an oven (or, with null, takes it back out). */
   | { type: 'bake'; id: string; item: number; unit: number; oven: number | null }
   /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
-  | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean };
+  | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean }
+  /** The number the next order gets, to follow pre-printed tickets (Koen). */
+  | { type: 'next-number'; number: number };
+
+export const MAX_ORDER_NUMBER = 999999;
+
+/** An order number: a whole number from 1 to 999999, or null. */
+export function cleanOrderNumber(n: unknown): number | null {
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= MAX_ORDER_NUMBER ? n : null;
+}
+
+/** Whether an order still in the shop (not picked up or cancelled) has this number. */
+export function numberInUse(state: Pick<QueueState, 'orders'>, n: number): boolean {
+  return state.orders.some((o) => o.number === n && o.status !== 'collected' && o.status !== 'cancelled');
+}
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
@@ -450,6 +464,11 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           ? { ...o, items, status: 'collected', updatedAt: now }
           : { ...o, items, updatedAt: now };
       });
+    }
+    case 'next-number': {
+      // Never a number an order in the shop still has, so two customers can't share one.
+      const n = cleanOrderNumber(action.number);
+      return n === null || numberInUse(state, n) ? state : { ...state, nextNumber: n };
     }
     case 'lang':
       return action.lang === 'nl' || action.lang === 'en' ? { ...state, lang: action.lang } : state;

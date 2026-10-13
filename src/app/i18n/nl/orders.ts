@@ -52,6 +52,11 @@ export const NL_ORDERS: Record<string, string> = {
   'Sending order…': 'Bestelling versturen…',
   Close: 'Sluiten',
   Cancel: 'Annuleren',
+  'Next order number': 'Volgend bestelnummer',
+  Change: 'Wijzigen',
+  Save: 'Opslaan',
+  'Enter a whole number from 1 to 999999.': 'Geef een geheel getal van 1 tot 999999.',
+  'Order #{n} is still in the shop. Pick another number.': 'Bestelling #{n} is nog niet afgehaald. Kies een ander nummer.',
   'No open orders.': 'Geen open bestellingen.',
   'Cancel order #{n}?': 'Bestelling #{n} annuleren?',
   // Order card and ready time

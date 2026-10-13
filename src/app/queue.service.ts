@@ -28,6 +28,7 @@ import {
   leftChange,
   randomId,
   Sponsor,
+  cleanOrderNumber,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
@@ -197,12 +198,12 @@ export class QueueService {
    * Creates a new queue and returns its id. It's saved online when it opens. Staff joining
    * it need the password as well as the link.
    */
-  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang, password: string): string {
+  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang, password: string, firstNumber = 1): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
       name: name.trim() || t('Pizza queue'),
-      nextNumber: 1,
+      nextNumber: cleanOrderNumber(firstNumber) ?? 1,
       menu,
       timing,
       orders: [],
@@ -403,6 +404,11 @@ export class QueueService {
 
   setTiming(timing: Timing): void {
     this.dispatch({ type: 'timing', timing });
+  }
+
+  /** Sets the number the next order gets (to follow a new roll of printed tickets). */
+  setNextNumber(number: number): void {
+    this.dispatch({ type: 'next-number', number });
   }
 
   setSponsors(sponsors: Sponsor[], seconds: number): void {

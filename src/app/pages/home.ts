@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing } from '../models';
+import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing, cleanOrderNumber } from '../models';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
 import { InstallApp } from './install-app';
@@ -24,6 +24,19 @@ import { LangSwitch } from '../i18n/lang-switch';
         <label>
           {{ 'Shop name' | t }}
           <input name="name" [(ngModel)]="name" placeholder="Pizzeria Napoli" maxlength="40" />
+        </label>
+        <label>
+          {{ 'First order number' | t }}
+          <input
+            name="firstNumber"
+            type="number"
+            min="1"
+            max="999999"
+            step="1"
+            inputmode="numeric"
+            [(ngModel)]="firstNumber"
+          />
+          <span class="hint">{{ 'The number on your first printed ticket. You can change it later when taking orders.' | t }}</span>
         </label>
         <div class="stack tight">
           <strong>{{ 'Pizzas on the menu' | t }}</strong>
@@ -92,6 +105,8 @@ export class Home {
 
   name = '';
   password = '';
+  /** Orders are numbered from here, to match tickets already printed (Koen). */
+  firstNumber = 1;
   code = '';
   joinError = signal('');
   createError = signal('');
@@ -104,6 +119,10 @@ export class Home {
       this.createError.set('Tick at least one pizza.');
       return;
     }
+    if (cleanOrderNumber(this.firstNumber) === null) {
+      this.createError.set('The first order number must be a whole number from 1 to 999999.');
+      return;
+    }
     if (this.password.trim().length < 4) {
       this.createError.set('Choose a queue password of at least 4 characters.');
       return;
@@ -114,7 +133,7 @@ export class Home {
     } catch {
       // Not remembering the menu is fine.
     }
-    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang(), this.password.trim()));
+    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang(), this.password.trim(), this.firstNumber));
   }
 
   join() {

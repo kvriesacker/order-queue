@@ -2225,3 +2225,25 @@ app-install {
     font-size: 1rem;
   }
 }
+
+/* Orders: the next order number, changeable for a new roll of printed tickets. */
+.next-number {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+}
+.next-number-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.next-number-form input {
+  width: 8rem;
+}
+.next-number .error {
+  flex-basis: 100%;
+  margin: 0;
+}

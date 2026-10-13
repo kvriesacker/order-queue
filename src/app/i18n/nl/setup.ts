@@ -57,6 +57,11 @@ export const NL_SETUP: Record<string, string> = {
   '€: a price for this pizza (empty: the general price below). Max: how many of a pizza the ingredients allow (empty: no limit).':
     '€: een prijs voor deze pizza (leeg: de algemene prijs hieronder). Max: hoeveel van een pizza de ingrediënten toelaten (leeg: geen limiet).',
   'That pizza is already on the list.': 'Die pizza staat al op de lijst.',
+  'First order number': 'Eerste bestelnummer',
+  'The number on your first printed ticket. You can change it later when taking orders.':
+    'Het nummer op je eerste geprinte briefje. Je kan het later nog aanpassen bij het bestellen.',
+  'The first order number must be a whole number from 1 to 999999.':
+    'Het eerste bestelnummer moet een geheel getal van 1 tot 999999 zijn.',
   // Timing editor ('Counter' is in common)
   'Pizzas available in total': "Pizza's beschikbaar in totaal",
   '(how many you can make; 0 = no limit)': '(hoeveel je kunt maken; 0 = geen limiet)',

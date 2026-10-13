@@ -1,6 +1,15 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NewOrderItem, OTHER_COLOR, formatPrice, orderTotal, priceOf, randomId } from '../models';
+import {
+  NewOrderItem,
+  OTHER_COLOR,
+  cleanOrderNumber,
+  formatPrice,
+  numberInUse,
+  orderTotal,
+  priceOf,
+  randomId,
+} from '../models';
 
 const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
@@ -193,6 +202,35 @@ import { FocusToggle } from './focus-toggle';
             {{ 'Remove {n} from this order to send it.' | t: { n: t.over } }}
           </p>
         }
+        <!-- The next number, changeable to follow a new roll of printed tickets (Koen). -->
+        <div class="next-number">
+          @if (!editNumber()) {
+            <span>{{ 'Next order number' | t }}: <strong>#{{ nextNumber() }}</strong></span>
+            <button class="btn ghost small" type="button" (click)="numberError.set(''); editNumber.set(true)">
+              {{ 'Change' | t }}
+            </button>
+          } @else {
+            <form class="next-number-form" (submit)="$event.preventDefault(); saveNumber(n.valueAsNumber)">
+              <label>
+                <span>{{ 'Next order number' | t }}</span>
+                <input
+                  #n
+                  type="number"
+                  min="1"
+                  max="999999"
+                  step="1"
+                  inputmode="numeric"
+                  [value]="nextNumber()"
+                />
+              </label>
+              <button class="btn small primary" type="submit">{{ 'Save' | t }}</button>
+              <button class="btn ghost small" type="button" (click)="editNumber.set(false)">{{ 'Cancel' | t }}</button>
+            </form>
+            @if (numberError()) {
+              <p class="error">{{ numberError() | t: { n: n.value } }}</p>
+            }
+          }
+        </div>
         <button
           class="btn primary big"
           type="button"
@@ -331,6 +369,18 @@ export class Take {
   });
   /** Pizzas that can still be sold, or null without a limit. */
   protected left = computed(() => this.queue.pizzasLeft());
+  protected nextNumber = computed(() => this.queue.state()?.nextNumber ?? 1);
+  protected editNumber = signal(false);
+  protected numberError = signal('');
+
+  saveNumber(value: number) {
+    const n = cleanOrderNumber(value);
+    const state = this.queue.state();
+    if (n === null) return this.numberError.set('Enter a whole number from 1 to 999999.');
+    if (state && numberInUse(state, n)) return this.numberError.set('Order #{n} is still in the shop. Pick another number.');
+    this.queue.setNextNumber(n);
+    this.editNumber.set(false);
+  }
   protected canAdd = computed(() => {
     const left = this.left();
     return left === null || this.cart().length < left;
