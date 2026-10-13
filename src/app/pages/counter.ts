@@ -18,7 +18,7 @@ import { UndoIcon } from './undo-icon';
       <div class="toolbar">
         @if (!focus()) {
           <a class="btn primary big" routerLink="../display">{{ 'Show customer screen' | t }}</a>
-          <a class="btn" [href]="displayLink()" target="_blank" rel="noopener">{{ 'Open in new window' | t }}</a>
+          <a class="btn" [href]="displayLink().href" [attr.target]="displayLink().target" rel="noopener">{{ 'Open in new window' | t }}</a>
         }
         <app-focus-toggle />
       </div>
@@ -110,7 +110,7 @@ export class Counter {
     this.queue.orders().filter((o) => isMaking(o) && !someBaked(o) && !partlyCalled(o)),
   );
   protected partly = partlyCalled;
-  protected displayLink = computed(() => this.queue.shareLink(this.queue.state()?.id) + '/display');
+  protected displayLink = computed(() => this.queue.screenLink('display', this.queue.state()?.id));
 }
 
 function isMaking(o: Order): boolean {

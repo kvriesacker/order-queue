@@ -35,6 +35,7 @@ import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
 import { OrderTrack, trackCrypto } from './tracking';
 import { FOLLOW_OVERRIDE, followLink } from './follow-app';
+import { IS_NATIVE, WEB_APP } from './native';
 import { EMULATOR_HOST, firestore } from './firebase';
 import { settle, trackChanges } from './sync';
 import { DEFAULT_LANG, Lang, queueLang, t } from './i18n/i18n';
@@ -505,6 +506,16 @@ export class QueueService {
     return `${appBase()}#/q/${id}`;
   }
 
+  /**
+   * A screen of this queue opened from a button (customer screen, shop display): a new tab
+   * on the web, inside the app on Android (where a new tab would leave the app).
+   */
+  screenLink(path: string, id = this.queueId): { href: string; target: string | null } {
+    return IS_NATIVE
+      ? { href: `#/q/${id}/${path}`, target: null }
+      : { href: `${this.shareLink(id)}/${path}`, target: '_blank' };
+  }
+
   /** The link a customer scans to follow one order, in the follow app (not this one). */
   trackLink(orderId: string): string {
     return followLink(orderId);
@@ -800,6 +811,8 @@ function docId(crypto: QueueCrypto): string {
 
 /** This app's address, keeping test overrides (emulator, follow app) so links work in local tests too. */
 function appBase(): string {
+  // In the Android app the page is https://localhost: others need the website.
+  if (IS_NATIVE) return WEB_APP;
   const { origin, pathname } = window.location;
   const params = new URLSearchParams();
   if (EMULATOR_HOST) params.set('emulator', EMULATOR_HOST);

@@ -1,0 +1,11 @@
+{
+	"appId": "io.github.kvriesacker.orderqueue",
+	"appName": "Pizza queue",
+	"webDir": "dist/order-queue/browser",
+	"android": {
+		"allowMixedContent": false
+	},
+	"server": {
+		"androidScheme": "https"
+	}
+}

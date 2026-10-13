@@ -39,7 +39,7 @@ import { splitNote } from './note-tags';
             >
               {{ 'Open orders' | t }} <span class="count">{{ open().length }}</span>
             </button>
-            <a class="btn small" [href]="screenLink()" target="_blank" rel="noopener"
+            <a class="btn small" [href]="screenLink().href" [attr.target]="screenLink().target" rel="noopener"
               >{{ 'Customer screen' | t }} ↗</a
             >
             <app-focus-toggle />
@@ -445,7 +445,7 @@ export class Take {
   protected clock = clockTime;
   /** The screen facing the customer while ordering, best opened on a second display. */
   protected screenLink = computed(
-    () => `${this.queue.shareLink(this.queue.state()?.id)}/order-screen?pos=${this.pos}`,
+    () => this.queue.screenLink(`order-screen?pos=${this.pos}`, this.queue.state()?.id),
   );
   protected until = (t: number) => minutesUntil(t, this.queue.now());
   protected lastTotal = computed(() => {
