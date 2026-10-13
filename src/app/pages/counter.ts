@@ -8,10 +8,11 @@ import { Eta } from './eta';
 import { T } from '../i18n/i18n';
 import { focusMode } from '../focus';
 import { FocusToggle } from './focus-toggle';
+import { UndoIcon } from './undo-icon';
 
 @Component({
   selector: 'app-counter',
-  imports: [OrderCard, CounterPizzas, RouterLink, Eta, FocusToggle, T],
+  imports: [OrderCard, CounterPizzas, RouterLink, Eta, FocusToggle, UndoIcon, T],
   template: `
     <main class="page" [class.focus]="focus()">
       <div class="toolbar">
@@ -43,11 +44,13 @@ import { FocusToggle } from './focus-toggle';
               @if (order.status === 'ready') {
                 @if (!partly(order)) {
                   <button
-                    class="btn ghost"
+                    class="btn ghost undo"
                     type="button"
+                    [title]="'Undo' | t"
+                    [attr.aria-label]="'Undo' | t"
                     (click)="queue.setStatus(order, 'in-progress')"
                   >
-                    {{ 'Undo' | t }}
+                    <app-undo-icon />
                   </button>
                 }
                 <button
@@ -71,8 +74,9 @@ import { FocusToggle } from './focus-toggle';
             <app-order-card [order]="order" [showItems]="false">
               <app-counter-pizzas pizzas [order]="order" mode="screen" />
               @if (order.status === 'ready-for-customer') {
-                <button class="btn ghost" type="button" (click)="queue.setStatus(order, 'ready')">
-                  {{ 'Undo' | t }}
+                <button class="btn ghost undo" type="button" [title]="'Undo' | t" [attr.aria-label]="'Undo' | t"
+                  (click)="queue.setStatus(order, 'ready')">
+                  <app-undo-icon />
                 </button>
                 <button
                   class="btn primary"

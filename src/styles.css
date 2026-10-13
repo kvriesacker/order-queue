@@ -2146,3 +2146,57 @@ app-install {
 .sponsor-seconds input {
   max-width: 8rem;
 }
+
+/* Undo is an icon (with its name for screen readers and as a tooltip). */
+.btn.undo {
+  border-color: var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding-inline: 0.5rem;
+}
+.btn.undo svg {
+  display: block;
+}
+
+/* On a phone, an oven row (and any row in full screen) puts its timer and buttons on a line
+   of their own under the pizza, so big text never runs over the row (Koen, iPhone 16). */
+@media (max-width: 560px) {
+  .pizzas li.oven-row,
+  .kitchen.focus .pizzas li {
+    flex-wrap: wrap;
+  }
+  .pizzas li.oven-row .pizza-actions,
+  .kitchen.focus .pizzas li .pizza-actions {
+    flex: 1 0 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .pizzas li.oven-row .bake-timer,
+  .kitchen.focus .pizzas li .bake-timer {
+    align-items: flex-start;
+    margin-right: auto;
+    min-width: 0;
+  }
+  /* A note too long to sit next to the pizza goes under it. */
+  .pizzas li.oven-row .pizza-meta,
+  .kitchen.focus .pizzas li .pizza-meta {
+    flex: 1 1 9rem;
+    overflow-wrap: anywhere;
+  }
+  .pizzas li.oven-row .pizza-meta:empty,
+  .kitchen.focus .pizzas li .pizza-meta:empty {
+    display: none;
+  }
+  .kitchen.focus .pizzas li .btn.success {
+    padding: 0.7rem 1.2rem;
+    font-size: 1.15rem;
+  }
+  .kitchen.focus .bake-timer {
+    font-size: 1.15rem;
+  }
+  .kitchen.focus .take-out {
+    font-size: 1rem;
+  }
+}

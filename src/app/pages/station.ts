@@ -7,6 +7,7 @@ import { Ovens } from './ovens';
 import { T, t } from '../i18n/i18n';
 import { focusMode } from '../focus';
 import { FocusToggle } from './focus-toggle';
+import { UndoIcon } from './undo-icon';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -49,7 +50,7 @@ const STATIONS = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta, TypeLimits, Ovens, FocusToggle, T],
+  imports: [Eta, TypeLimits, Ovens, FocusToggle, UndoIcon, T],
   template: `
     <main class="page kitchen" [class.focus]="focus()">
       <section class="column">
@@ -82,6 +83,7 @@ const STATIONS = {
                     [class]="rowClass(p)"
                     [class.tap-row]="rowTap(p) !== null"
                     [class.in-oven]="isInOven(p)"
+                    [class.oven-row]="station() === 'oven'"
                     [class.bake-done]="isInOven(p) && bakeLeft(p) <= 0"
                     (click)="tapRow(entry.order, p)"
                   >
@@ -156,12 +158,13 @@ const STATIONS = {
                 <span class="muted recent-oven">{{ 'In the oven' | t }}</span>
               } @else {
               <button
-                class="btn ghost small"
+                class="btn ghost small undo"
                 type="button"
+                [title]="'Undo' | t"
                 (click)="set(r.order, r, config().from)"
                 [attr.aria-label]="'Undo {pizza} of order {n}' | t: { pizza: r.name, n: r.order.number }"
               >
-                {{ 'Undo' | t }}
+                <app-undo-icon />
               </button>
               }
             </li>
@@ -198,11 +201,13 @@ const STATIONS = {
             <div class="mini">
               <strong>#{{ order.number }}</strong>
               <button
-                class="btn ghost small"
+                class="btn ghost small undo"
                 type="button"
+                [title]="'Undo' | t"
+                [attr.aria-label]="'Undo' | t"
                 (click)="queue.setStatus(order, 'in-progress')"
               >
-                {{ 'Undo' | t }}
+                <app-undo-icon />
               </button>
             </div>
           } @empty {

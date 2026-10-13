@@ -31,6 +31,12 @@ test('kitchen and oven see what they just marked and can undo it', async ({ page
   await expect(recent.first()).toContainText('Margherita');
   await expect(recent.first()).toContainText('just now');
 
+  // Undo is a compact icon (no text), named for screen readers and in its tooltip.
+  const undo = page.getByRole('button', { name: 'Undo Margherita of order 1' });
+  await expect(undo.locator('svg')).toBeVisible();
+  await expect(undo).toHaveText('');
+  await expect(undo).toHaveAttribute('title', 'Undo');
+
   // A mistake: undo puts it back to prepare.
   await page.getByRole('button', { name: 'Undo Margherita of order 1' }).click();
   await expect(page.locator('.kitchen-order')).toHaveCount(1);
@@ -44,6 +50,7 @@ test('kitchen and oven see what they just marked and can undo it', async ({ page
   await expect(page.locator('.kitchen-order')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Just baked' })).toBeVisible();
   await expect(recent.first()).toContainText('#1');
+  await page.screenshot({ path: `test-results/undo-icon-${test.info().project.name}.png` });
   await tab(page, 'Counter').click();
   await expect(page.locator('app-order-card', { hasText: '#1' })).toBeVisible();
 

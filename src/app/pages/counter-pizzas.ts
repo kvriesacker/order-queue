@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { Order, STAGE_LABELS, pizzaCalled, pizzaStage, textOn } from '../models';
 import { QueueService } from '../queue.service';
 import { T } from '../i18n/i18n';
+import { UndoIcon } from './undo-icon';
 import { byType } from './station';
 
 /** Part of a big order is on the customer screen (or given), the rest isn't yet. */
@@ -27,7 +28,7 @@ export function waitingAtCounter(order: Order): boolean {
  */
 @Component({
   selector: 'app-counter-pizzas',
-  imports: [T],
+  imports: [T, UndoIcon],
   template: `
     <ul class="counter-pizzas">
       @for (p of pizzas(); track p.item + '-' + p.unit) {
@@ -41,15 +42,17 @@ export function waitingAtCounter(order: Order): boolean {
               @if (p.handed) {
                 <span class="done">{{ '✓ Handed over' | t }}</span>
                 @if (perPizza()) {
-                  <button class="btn ghost small" type="button" (click)="hand(p, false)"
+                  <button class="btn ghost small undo" type="button" (click)="hand(p, false)"
+                    [title]="'Undo' | t"
                     [attr.aria-label]="'Undo handing over {pizza}' | t: { pizza: p.name }">
-                    {{ 'Undo' | t }}
+                    <app-undo-icon />
                   </button>
                 }
               } @else if (perPizza()) {
-                <button class="btn ghost small" type="button" (click)="call(p, false)"
+                <button class="btn ghost small undo" type="button" (click)="call(p, false)"
+                  [title]="'Undo' | t"
                   [attr.aria-label]="'Take {pizza} off the customer screen' | t: { pizza: p.name }">
-                  {{ 'Undo' | t }}
+                  <app-undo-icon />
                 </button>
                 <button class="btn small primary" type="button" (click)="hand(p, true)"
                   [attr.aria-label]="'Hand over {pizza}' | t: { pizza: p.name }">
