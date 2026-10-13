@@ -2280,3 +2280,48 @@ app-install {
   flex: 1;
   min-width: 0;
 }
+
+/* A pizza's options in the kitchen, oven and counter: bright yellow tags, rounded unlike the
+   pizza chips, so they stand out from every pizza colour (Koen). */
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  font-style: normal;
+}
+.note-tag {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: #ffe14d;
+  border: 2px solid #8a6500;
+  color: #2b1d00;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.order .note.note-tags {
+  color: inherit;
+  margin-top: 0.2rem;
+}
+.kitchen.focus .note-tag {
+  padding: 0.2rem 0.7rem;
+}
+@media (max-width: 560px) {
+  /* On a phone the tags get a line of their own under the pizza and its button. */
+  .pizzas li {
+    flex-wrap: wrap;
+  }
+  .pizzas li .pizza-meta:has(.note-tag) {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  /* Where the buttons have their own line too, the tags stay right under the pizza. */
+  .pizzas li.oven-row .pizza-actions,
+  .kitchen.focus .pizzas li .pizza-actions {
+    order: 4;
+  }
+}

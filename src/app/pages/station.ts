@@ -8,6 +8,7 @@ import { T, t } from '../i18n/i18n';
 import { focusMode } from '../focus';
 import { FocusToggle } from './focus-toggle';
 import { UndoIcon } from './undo-icon';
+import { NoteTags } from './note-tags';
 
 /** One pizza of an order, so each station handles pizzas one by one. */
 interface PizzaRow {
@@ -50,7 +51,7 @@ const STATIONS = {
 
 @Component({
   selector: 'app-station',
-  imports: [Eta, TypeLimits, Ovens, FocusToggle, UndoIcon, T],
+  imports: [Eta, TypeLimits, Ovens, FocusToggle, UndoIcon, NoteTags, T],
   template: `
     <main class="page kitchen" [class.focus]="focus()">
       <section class="column">
@@ -92,7 +93,7 @@ const STATIONS = {
                     </span>
                     <span class="pizza-meta">
                       @if (p.note) {
-                        <em class="note">{{ p.note }}</em>
+                        <app-note-tags [note]="p.note" />
                       }
                     </span>
                     <span class="pizza-actions">

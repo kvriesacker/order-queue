@@ -3,6 +3,7 @@ import { Order, STAGE_LABELS, pizzaCalled, pizzaStage, textOn } from '../models'
 import { QueueService } from '../queue.service';
 import { T } from '../i18n/i18n';
 import { UndoIcon } from './undo-icon';
+import { NoteTags } from './note-tags';
 import { byType } from './station';
 
 /** Part of a big order is on the customer screen (or given), the rest isn't yet. */
@@ -28,14 +29,14 @@ export function waitingAtCounter(order: Order): boolean {
  */
 @Component({
   selector: 'app-counter-pizzas',
-  imports: [T, UndoIcon],
+  imports: [T, UndoIcon, NoteTags],
   template: `
     <ul class="counter-pizzas">
       @for (p of pizzas(); track p.item + '-' + p.unit) {
         <li [class.handed]="p.handed" [class.waiting]="p.status !== 'baked'">
           <span class="chip" [style.background]="p.color" [style.color]="textOn(p.color)">{{ p.name }}</span>
           @if (p.note) {
-            <em class="note">{{ p.note }}</em>
+            <app-note-tags [note]="p.note" />
           }
           <span class="counter-pizza-end">
             @if (mode() === 'screen') {

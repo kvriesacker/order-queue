@@ -18,6 +18,7 @@ import { OrderCard } from './order-card';
 import { T, t } from '../i18n/i18n';
 import { focusMode } from '../focus';
 import { FocusToggle } from './focus-toggle';
+import { splitNote } from './note-tags';
 
 @Component({
   selector: 'app-take',
@@ -539,9 +540,3 @@ function orderPoint(): string {
   }
 }
 
-function splitNote(note: string): string[] {
-  return note
-    .split(',')
-    .map((n) => n.trim())
-    .filter(Boolean);
-}

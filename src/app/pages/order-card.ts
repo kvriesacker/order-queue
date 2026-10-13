@@ -2,11 +2,12 @@ import { Component, computed, inject, input } from '@angular/core';
 import { DISPLAY_STAGES, Order, STAGE_LABELS, STATUS_LABELS, stageCounts } from '../models';
 import { QueueService } from '../queue.service';
 import { Eta } from './eta';
+import { NoteTags } from './note-tags';
 import { T, dateLocale, t } from '../i18n/i18n';
 
 @Component({
   selector: 'app-order-card',
-  imports: [Eta, T],
+  imports: [Eta, NoteTags, T],
   template: `
     <article class="order" [class]="order().status">
       <header>
@@ -27,7 +28,7 @@ import { T, dateLocale, t } from '../i18n/i18n';
             <span class="dot" [style.background]="item.color"></span>
             <span class="qty">{{ item.qty }}×</span> {{ item.name }}
             @if (item.note) {
-              <em class="note">{{ item.note }}</em>
+              <app-note-tags [note]="item.note" />
             }
           </li>
         }
