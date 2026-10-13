@@ -123,6 +123,18 @@ const STATIONS = {
                             {{ (left > 0 ? '{time} left' : 'Done {time} ago') | t: { time: clock(left) } }}
                           </span>
                         }
+                        @if (isInOven(p)) {
+                          <!-- A mistake: back out of the oven, waiting for an oven again. -->
+                          <button
+                            class="btn ghost undo"
+                            type="button"
+                            [title]="'Undo' | t"
+                            [attr.aria-label]="'Take {pizza} out of the oven again' | t: { pizza: p.name }"
+                            (click)="$event.stopPropagation(); takeOut(entry.order, p)"
+                          >
+                            <app-undo-icon />
+                          </button>
+                        }
                         <button class="btn success" type="button">
                           {{ config().action | t }}
                         </button>
@@ -296,6 +308,10 @@ export class Station {
 
   set(order: Order, p: PizzaRow, status: PizzaStatus) {
     this.queue.setPizza(order, p.item, p.unit, status);
+  }
+
+  takeOut(order: Order, p: PizzaRow) {
+    this.queue.putInOven(order, p.item, p.unit, null);
   }
 
   putIn(order: Order, p: PizzaRow, oven: number) {

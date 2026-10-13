@@ -25,18 +25,26 @@ test('a pizza that has baked long enough turns red and says to take it out', asy
   await tab(page, 'Oven').click();
   const row = page.locator('.kitchen-order .pizzas li', { hasText: 'Margherita' });
   await row.getByRole('button', { name: 'In the oven' }).click();
+  // Put in by mistake: the arrow next to Baked takes it back out, to wait for the oven again.
+  await row.getByRole('button', { name: 'Take Margherita out of the oven again' }).click();
+  await expect(row.getByRole('timer')).toHaveCount(0);
+  await expect(row.getByRole('button', { name: 'Baked', exact: true })).toHaveCount(0);
+  await row.getByRole('button', { name: 'In the oven' }).click();
+  await expect(row.getByRole('button', { name: 'Take Margherita out of the oven again' })).toBeVisible();
   // Still baking: the usual yellow row, no warning.
   await expect(row).toHaveClass(/in-oven/);
   await expect(row).not.toHaveClass(/bake-done/);
   await expect(row.getByText('Take it out!')).toHaveCount(0);
 
-  // Done: red frame, the warning, and a red Baked button.
+  // Done: a blinking red border and the warning; the row and Baked keep their colours.
   await expect(row).toHaveClass(/bake-done/, { timeout: 10_000 });
   await expect(row.getByRole('timer')).toContainText(/Take it out!\s*Done 0:\d\d ago/);
   const frame = await row.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(frame).toContain('inset');
   const button = row.getByRole('button', { name: 'Baked', exact: true });
-  expect(await button.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(200, 16, 46)');
+  expect(await button.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(31, 122, 58)');
+  expect(await row.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(255, 241, 217)');
+  expect(await row.evaluate((el) => getComputedStyle(el).animationName)).toBe('bake-row');
   await page.screenshot({ path: `test-results/oven-done-${info.project.name}.png` });
 
   await button.click();

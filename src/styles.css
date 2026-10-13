@@ -2072,16 +2072,10 @@ app-install {
     animation: none;
   }
 }
-/* Baked long enough: the whole row turns red and pulses until it's marked baked. */
+/* Baked long enough: only the border turns red and blinks until it's marked baked (Koen). */
 .pizzas li.in-oven.bake-done {
-  background: #ffe1dc;
   box-shadow: inset 0 0 0 4px var(--tomato);
-  animation: bake-row 0.8s ease-in-out infinite alternate;
-}
-.pizzas li.bake-done .btn.success {
-  background: var(--tomato);
-  border-color: var(--tomato);
-  color: #fff;
+  animation: bake-row 0.7s steps(1, end) infinite;
 }
 .take-out {
   font-size: 1.15rem;
@@ -2089,8 +2083,8 @@ app-install {
   letter-spacing: 0.02em;
 }
 @keyframes bake-row {
-  to {
-    background: #ffb3a8;
+  50% {
+    box-shadow: inset 0 0 0 4px transparent;
   }
 }
 @media (prefers-reduced-motion: reduce) {
