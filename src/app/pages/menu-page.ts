@@ -1,18 +1,19 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
-  DEFAULT_SPONSOR_SECONDS, DEFAULT_TIMING, MenuItem, QueueState, Sponsor, Timing, cleanSponsors, pizzasLeft,
-  pizzasSold,
+  DEFAULT_QUICK_NOTES, DEFAULT_SPONSOR_SECONDS, DEFAULT_TIMING, MenuItem, QueueState, Sponsor, Timing,
+  cleanQuickNotes, cleanSponsors, pizzasLeft, pizzasSold,
 } from '../models';
 import { QueueService } from '../queue.service';
 import { phaseTimes } from '../estimate';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
-import { Lang, T, isLang } from '../i18n/i18n';
+import { QuickNotesEditor } from './quick-notes-editor';
+import { Lang, T, isLang, t } from '../i18n/i18n';
 
 /** Lets the staff change the menu and the starting time estimate while the queue runs. */
 @Component({
   selector: 'app-menu-page',
-  imports: [MenuEditor, TimingEditor, T],
+  imports: [MenuEditor, TimingEditor, QuickNotesEditor, T],
   template: `
     <main class="page narrow-page">
       <section class="card stack">
@@ -31,6 +32,11 @@ import { Lang, T, isLang } from '../i18n/i18n';
         <h2>{{ 'Menu' | t }}</h2>
         <p class="hint">{{ 'Changes apply to new orders. Orders already placed keep their colors.' | t }}</p>
         <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
+        <h2>{{ 'Options per pizza' | t }}</h2>
+        <p class="hint">
+          {{ 'Quick picks for the note of each pizza when taking orders. Remove them all to keep only the free text note.' | t }}
+        </p>
+        <app-quick-notes-editor [(notes)]="quickNotes" />
         <h2>{{ 'Pizzas and ready times' | t }}</h2>
         @if (sold(); as s) {
           <p class="hint">
@@ -102,6 +108,7 @@ export class MenuPage {
   protected timing = signal<Timing>({ ...DEFAULT_TIMING });
   protected saved = signal(false);
   protected sponsors = signal<Sponsor[]>([]);
+  protected quickNotes = signal<string[]>([]);
   protected sponsorSeconds = signal(DEFAULT_SPONSOR_SECONDS);
   /** The queue's settings as last loaded into the editor (or saved from it). */
   private base = signal<string | null>(null);
@@ -156,6 +163,7 @@ export class MenuPage {
     this.timing.set(state.timing);
     this.sponsors.set(state.sponsors ?? []);
     this.sponsorSeconds.set(state.sponsorSeconds ?? DEFAULT_SPONSOR_SECONDS);
+    this.quickNotes.set(state.quickNotes ?? DEFAULT_QUICK_NOTES.map((n) => t(n)));
     this.base.set(this.json());
   }
 
@@ -166,6 +174,7 @@ export class MenuPage {
       timing: this.timing(),
       sponsors: this.sponsors(),
       seconds: this.sponsorSeconds(),
+      quickNotes: this.quickNotes(),
     });
   }
 
@@ -182,10 +191,17 @@ export class MenuPage {
     this.sponsors.update((list) => list.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
   }
 
+  private quickNotesChanged(): boolean {
+    const base = this.base();
+    return base === null || JSON.stringify(JSON.parse(base).quickNotes) !== JSON.stringify(this.quickNotes());
+  }
+
   save() {
     this.queue.setMenu(this.menu());
     this.queue.setTiming(this.timing());
     this.queue.setSponsors(cleanSponsors(this.sponsors()), this.sponsorSeconds());
+    // Saved only once changed, so older queues keep following the staff's language.
+    if (this.quickNotesChanged()) this.queue.setQuickNotes(cleanQuickNotes(this.quickNotes()));
     // Blank rows are dropped when saved.
     this.sponsors.set(cleanSponsors(this.sponsors()));
     this.base.set(this.json());

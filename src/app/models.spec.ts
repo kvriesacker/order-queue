@@ -2,7 +2,7 @@ import {
   Order, PizzaStatus, QueueAction, QueueState, applyAction, displayStage, normalizeState, outranks, ovenLoad,
   pizzaStage, stageCounts,
   cleanPrice, formatPrice, kitchenLeft, leftChange, orderTotal, pizzasLeft, priceOf, typeLeft, typeMade,
-  typeSold,
+  typeSold, cleanQuickNotes,
 } from './models';
 
 describe('applyAction', () => {
@@ -47,6 +47,19 @@ describe('applyAction', () => {
     // Once that order is picked up, its number may be used again.
     s = applyAction(s, { type: 'status', id: 'b', status: 'collected' });
     expect(applyAction(s, { type: 'next-number', number: 2 }).nextNumber).toBe(2);
+  });
+
+  it('keeps the quick picks for notes short, without blanks, commas or doubles', () => {
+    expect(cleanQuickNotes([' Extra kaas ', '', 'extra KAAS', 'Ham, ananas', 'x'.repeat(40), 5])).toEqual([
+      'Extra kaas', 'Ham ananas', 'x'.repeat(30),
+    ]);
+    const s = applyAction(empty, { type: 'quick-notes', notes: ['Pikant', ' '] });
+    expect(s.quickNotes).toEqual(['Pikant']);
+    // None at all is a choice too: only the free text note.
+    expect(applyAction(s, { type: 'quick-notes', notes: [] }).quickNotes).toEqual([]);
+    // A queue that never set them keeps the standard ones (missing, not empty).
+    expect('quickNotes' in normalizeState(empty)).toBe(false);
+    expect(normalizeState({ ...empty, quickNotes: [] }).quickNotes).toEqual([]);
   });
 
   it('ignores a duplicate add, such as a resent action', () => {

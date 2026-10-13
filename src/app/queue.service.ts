@@ -29,6 +29,7 @@ import {
   randomId,
   Sponsor,
   cleanOrderNumber,
+  cleanQuickNotes,
 } from './models';
 import { QueueCrypto } from './queue-crypto';
 import { estimateReady } from './estimate';
@@ -198,7 +199,15 @@ export class QueueService {
    * Creates a new queue and returns its id. It's saved online when it opens. Staff joining
    * it need the password as well as the link.
    */
-  create(name: string, menu: MenuItem[], timing: Timing, lang: Lang, password: string, firstNumber = 1): string {
+  create(
+    name: string,
+    menu: MenuItem[],
+    timing: Timing,
+    lang: Lang,
+    password: string,
+    firstNumber = 1,
+    quickNotes?: string[],
+  ): string {
     const id = randomId(10);
     const state: QueueState = {
       id,
@@ -213,6 +222,7 @@ export class QueueService {
       hostEpoch: 0,
       hostId: '',
       lang,
+      ...(quickNotes ? { quickNotes: cleanQuickNotes(quickNotes) } : {}),
     };
     localStorage.setItem(COPY_KEY(id), JSON.stringify(state));
     localStorage.setItem(PASSWORD_KEY(id), password);
@@ -404,6 +414,11 @@ export class QueueService {
 
   setTiming(timing: Timing): void {
     this.dispatch({ type: 'timing', timing });
+  }
+
+  /** The quick picks for a pizza's note when taking orders. */
+  setQuickNotes(notes: string[]): void {
+    this.dispatch({ type: 'quick-notes', notes });
   }
 
   /** Sets the number the next order gets (to follow a new roll of printed tickets). */

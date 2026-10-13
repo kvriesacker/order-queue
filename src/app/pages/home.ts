@@ -2,16 +2,17 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { QueueService } from '../queue.service';
-import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing, cleanOrderNumber } from '../models';
+import { DEFAULT_MENU, DEFAULT_TIMING, MenuItem, QueueState, TIMING_KEYS, Timing, cleanOrderNumber, cleanQuickNotes, DEFAULT_QUICK_NOTES } from '../models';
 import { MenuEditor } from './menu-editor';
 import { TimingEditor } from './timing-editor';
+import { QuickNotesEditor } from './quick-notes-editor';
 import { InstallApp } from './install-app';
 import { T, dateLocale, lang, queueLang, t } from '../i18n/i18n';
 import { LangSwitch } from '../i18n/lang-switch';
 
 @Component({
   selector: 'app-home',
-  imports: [FormsModule, MenuEditor, TimingEditor, InstallApp, T, LangSwitch],
+  imports: [FormsModule, MenuEditor, TimingEditor, QuickNotesEditor, InstallApp, T, LangSwitch],
   template: `
     <main class="home">
       <div class="home-lang"><app-lang-switch /></div>
@@ -43,6 +44,11 @@ import { LangSwitch } from '../i18n/lang-switch';
           <span class="hint">{{ 'Untick what you don’t sell and pick a color for each pizza.' | t }}</span>
         </div>
         <app-menu-editor [(menu)]="menu" [defaultPrice]="timing().price" />
+        <div class="stack tight">
+          <strong>{{ 'Options per pizza' | t }}</strong>
+          <span class="hint">{{ 'Quick picks for the note of each pizza when taking orders. Remove them all to keep only the free text note.' | t }}</span>
+        </div>
+        <app-quick-notes-editor [(notes)]="quickNotes" />
         <strong>{{ 'Pizzas and ready times' | t }}</strong>
         <app-timing-editor [(timing)]="timing" />
         <label>
@@ -112,6 +118,7 @@ export class Home {
   createError = signal('');
   menu = signal<MenuItem[]>(lastMenu());
   timing = signal<Timing>(lastTiming());
+  quickNotes = signal<string[]>(lastQuickNotes());
   mine = signal(hostedQueues());
 
   create() {
@@ -130,10 +137,11 @@ export class Home {
     try {
       localStorage.setItem(LAST_MENU_KEY, JSON.stringify(this.menu()));
       localStorage.setItem(LAST_TIMING_KEY, JSON.stringify(this.timing()));
+      localStorage.setItem(LAST_NOTES_KEY, JSON.stringify(this.quickNotes()));
     } catch {
       // Not remembering the menu is fine.
     }
-    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang(), this.password.trim(), this.firstNumber));
+    this.go(this.queue.create(this.name, this.menu(), this.timing(), lang(), this.password.trim(), this.firstNumber, this.quickNotes()));
   }
 
   join() {
@@ -171,6 +179,18 @@ export class Home {
 
 const LAST_MENU_KEY = 'pizza-queue:last-menu';
 const LAST_TIMING_KEY = 'pizza-queue:last-timing';
+const LAST_NOTES_KEY = 'pizza-queue:last-quick-notes';
+
+/** The quick picks of the last queue started here, or the standard ones in this language. */
+function lastQuickNotes(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_NOTES_KEY) ?? 'null');
+    if (Array.isArray(saved)) return cleanQuickNotes(saved);
+  } catch {
+    // Fall back to the standard ones.
+  }
+  return DEFAULT_QUICK_NOTES.map((n) => t(n));
+}
 
 function lastTiming(): Timing {
   try {

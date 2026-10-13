@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  DEFAULT_QUICK_NOTES,
   NewOrderItem,
   OTHER_COLOR,
   cleanOrderNumber,
@@ -11,7 +12,6 @@ import {
   randomId,
 } from '../models';
 
-const QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
 import { QueueService } from '../queue.service';
 import { clockTime, estimateIfSent, minutesUntil } from '../estimate';
 import { OrderCard } from './order-card';
@@ -120,18 +120,20 @@ import { FocusToggle } from './focus-toggle';
                     ✕
                   </button>
                 </div>
+                @if (quickNotes().length) {
                 <div class="quick-notes">
-                  @for (q of quickNotes; track q) {
+                  @for (q of quickNotes(); track q) {
                     <button
                       class="note-chip"
                       type="button"
                       [class.on]="hasNote(line.note, q)"
                       (click)="toggleNote(i, q)"
                     >
-                      {{ q | t }}
+                      {{ q }}
                     </button>
                   }
                 </div>
+                }
                 <input
                   class="line-note"
                   [ngModel]="line.note"
@@ -309,7 +311,11 @@ export class Take {
   protected focus = focusMode;
   protected menu = computed(() => (this.queue.state()?.menu ?? []).filter((m) => m.enabled));
   protected cart = signal<NewOrderItem[]>([]);
-  protected quickNotes = QUICK_NOTES;
+  /** The host's quick picks; the standard ones (in the staff's language) when never set. */
+  protected quickNotes = computed(() => {
+    const notes = this.queue.state()?.quickNotes;
+    return notes ?? DEFAULT_QUICK_NOTES.map((n) => t(n));
+  });
   protected custom = '';
   protected customer = signal('');
   /** The open orders slide in from the side only when asked, to leave room for the order. */
@@ -478,15 +484,15 @@ export class Take {
 
   /** Quick notes go into the note in the language shown (the kitchen reads them). */
   hasNote(note: string, quick: string): boolean {
-    const text = t(quick).toLowerCase();
+    const text = quick.toLowerCase();
     return splitNote(note).some((n) => n.toLowerCase() === text);
   }
 
   toggleNote(index: number, quick: string) {
     const parts = splitNote(this.cart()[index].note);
     const next = this.hasNote(this.cart()[index].note, quick)
-      ? parts.filter((n) => n.toLowerCase() !== t(quick).toLowerCase())
-      : [...parts, t(quick)];
+      ? parts.filter((n) => n.toLowerCase() !== quick.toLowerCase())
+      : [...parts, quick];
     this.setNote(index, next.join(', '));
   }
 

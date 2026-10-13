@@ -85,6 +85,31 @@ export interface QueueState {
   sponsors?: Sponsor[];
   /** Seconds each sponsor stays on the customer screens before the next one. */
   sponsorSeconds?: number;
+  /**
+   * Quick picks for a pizza's note when taking orders (Koen). Missing: the standard ones in
+   * the staff's language; empty: only the free text note.
+   */
+  quickNotes?: string[];
+}
+
+/** The standard quick picks (English keys of the Dutch dictionary). */
+export const DEFAULT_QUICK_NOTES = ['No cheese', 'Extra cheese', 'No onion', 'Spicy', 'Gluten free', 'Well done'];
+export const MAX_QUICK_NOTES = 20;
+export const MAX_QUICK_NOTE_LENGTH = 30;
+
+/** Quick picks as the order page can show them: trimmed, short, no blanks or doubles. */
+export function cleanQuickNotes(notes: unknown): string[] {
+  if (!Array.isArray(notes)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of notes) {
+    // A comma would split the pick in two inside the note.
+    const text = typeof n === 'string' ? n.replace(/,/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_QUICK_NOTE_LENGTH) : '';
+    if (!text || seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    out.push(text);
+  }
+  return out.slice(0, MAX_QUICK_NOTES);
 }
 
 /** A sponsor on the customer screens: a name, and optionally a short message. */
@@ -274,6 +299,7 @@ export type QueueAction =
   | { type: 'bake'; id: string; item: number; unit: number; oven: number | null }
   /** The kitchen changes one pizza's maximum or sold-out mark, without touching the rest. */
   | { type: 'type-limit'; name: string; max?: number; soldOut?: boolean }
+  | { type: 'quick-notes'; notes: string[] }
   /** The number the next order gets, to follow pre-printed tickets (Koen). */
   | { type: 'next-number'; number: number };
 
@@ -465,6 +491,8 @@ export function applyAction(state: QueueState, action: QueueAction, now = Date.n
           : { ...o, items, updatedAt: now };
       });
     }
+    case 'quick-notes':
+      return { ...state, quickNotes: cleanQuickNotes(action.notes) };
     case 'next-number': {
       // Never a number an order in the shop still has, so two customers can't share one.
       const n = cleanOrderNumber(action.number);
@@ -728,9 +756,11 @@ export function normalizeState(state: QueueState): QueueState {
   const lang = state.lang === 'en' ? 'en' : 'nl';
   const sponsors = cleanSponsors(state.sponsors);
   const sponsorSeconds = cleanSponsorSeconds(state.sponsorSeconds);
+  // Missing stays missing: those queues keep the standard quick picks.
+  const quickNotes = state.quickNotes === undefined ? {} : { quickNotes: cleanQuickNotes(state.quickNotes) };
   return {
     id, name, nextNumber, menu, timing, orders, soldCleared, soldClearedByType, ovensOut,
-    hostEpoch, hostId, lang, sponsors, sponsorSeconds,
+    hostEpoch, hostId, lang, sponsors, sponsorSeconds, ...quickNotes,
   };
 }
 

@@ -58,6 +58,14 @@ export const NL_SETUP: Record<string, string> = {
     '€: een prijs voor deze pizza (leeg: de algemene prijs hieronder). Max: hoeveel van een pizza de ingrediënten toelaten (leeg: geen limiet).',
   'That pizza is already on the list.': 'Die pizza staat al op de lijst.',
   'First order number': 'Eerste bestelnummer',
+  'Options per pizza': 'Opties per pizza',
+  'Quick picks for the note of each pizza when taking orders. Remove them all to keep only the free text note.':
+    'Snelle keuzes voor de opmerking bij elke pizza tijdens het bestellen. Verwijder ze allemaal om enkel het vrije tekstveld te houden.',
+  'No options: only the free text note per pizza.': 'Geen opties: enkel het vrije tekstveld per pizza.',
+  'New option, e.g. Extra cheese': 'Nieuwe optie, bv. Extra kaas',
+  'New option': 'Nieuwe optie',
+  '+ Add option': '+ Optie toevoegen',
+  'Remove option {name}': 'Optie {name} verwijderen',
   'The number on your first printed ticket. You can change it later when taking orders.':
     'Het nummer op je eerste geprinte briefje. Je kan het later nog aanpassen bij het bestellen.',
   'The first order number must be a whole number from 1 to 999999.':

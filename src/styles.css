@@ -2247,3 +2247,36 @@ app-install {
   flex-basis: 100%;
   margin: 0;
 }
+
+/* Settings and start page: the quick picks for a pizza's note. */
+.quick-notes-editor {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.quick-notes-editor .note-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: default;
+}
+.chip-remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0 0.15rem;
+  cursor: pointer;
+}
+.quick-notes-add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.quick-notes-add input {
+  flex: 1;
+  min-width: 0;
+}
