@@ -2041,6 +2041,32 @@ app-install {
     animation: none;
   }
 }
+/* Baked long enough: the whole row turns red and pulses until it's marked baked. */
+.pizzas li.in-oven.bake-done {
+  background: #ffe1dc;
+  box-shadow: inset 0 0 0 4px var(--tomato);
+  animation: bake-row 0.8s ease-in-out infinite alternate;
+}
+.pizzas li.bake-done .btn.success {
+  background: var(--tomato);
+  border-color: var(--tomato);
+  color: #fff;
+}
+.take-out {
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+@keyframes bake-row {
+  to {
+    background: #ffb3a8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pizzas li.in-oven.bake-done {
+    animation: none;
+  }
+}
 .kitchen.focus .bake-timer {
   font-size: 1.4rem;
 }

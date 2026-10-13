@@ -37,6 +37,7 @@ export const NL_STATIONS: Record<string, string> = {
   'Every oven is out of order': 'Alle ovens zijn buiten gebruik',
   '{time} left': 'Nog {time}',
   'Done {time} ago': 'Klaar sinds {time}',
+  'Take it out!': 'Uit de oven!',
   'Out of order': 'Defect',
   'Working again': 'Werkt weer',
   'Mark out of order': 'Als defect melden',

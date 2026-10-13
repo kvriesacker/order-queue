@@ -82,6 +82,7 @@ const STATIONS = {
                     [class]="rowClass(p)"
                     [class.tap-row]="rowTap(p) !== null"
                     [class.in-oven]="isInOven(p)"
+                    [class.bake-done]="isInOven(p) && bakeLeft(p) <= 0"
                     (click)="tapRow(entry.order, p)"
                   >
                     <span class="chip" [style.background]="p.color" [style.color]="textOn(p.color)">
@@ -113,6 +114,9 @@ const STATIONS = {
                           <span class="bake-timer" [class.done]="left <= 0" role="timer">
                             @if (ovenCount() > 1) {
                               <small>{{ 'Oven {n}' | t: { n: (p.times.oven ?? 0) + 1 } }}</small>
+                            }
+                            @if (left <= 0) {
+                              <strong class="take-out">{{ 'Take it out!' | t }}</strong>
                             }
                             {{ (left > 0 ? '{time} left' : 'Done {time} ago') | t: { time: clock(left) } }}
                           </span>
