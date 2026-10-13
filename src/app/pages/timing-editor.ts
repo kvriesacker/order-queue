@@ -6,9 +6,9 @@ import { T } from '../i18n/i18n';
 type Field = { key: keyof Timing; label: string; hint: string };
 
 const FIELDS: Field[] = [
-  { key: 'prepareMinutes', label: 'Prepare', hint: 'seconds per pizza in the kitchen' },
-  { key: 'bakeMinutes', label: 'Bake', hint: 'seconds in the oven' },
-  { key: 'counterMinutes', label: 'Counter', hint: 'seconds to call the order once baked' },
+  { key: 'prepareMinutes', label: 'Prepare', hint: 'per pizza in the kitchen' },
+  { key: 'bakeMinutes', label: 'Bake', hint: 'in the oven' },
+  { key: 'counterMinutes', label: 'Counter', hint: 'to call the order once baked' },
 ];
 
 const OVEN_FIELDS: Field[] = [
@@ -52,23 +52,42 @@ const OVEN_FIELDS: Field[] = [
         [attr.aria-label]="'Price per pizza' | t"
       />
     </label>
-    <div class="grid3">
+    <div class="grid3 durations">
       @for (f of fields; track f.key) {
-        <label>
-          <span
-            >{{ f.label | t }} <span class="muted">({{ f.hint | t }})</span></span
-          >
-          <!-- Set in seconds, to start closer to the real pace; kept in minutes. -->
-          <input
-            type="number"
-            min="5"
-            max="10800"
-            step="5"
-            inputmode="numeric"
-            [value]="seconds(timing()[f.key])"
-            (input)="setSeconds(f.key, $any($event.target).valueAsNumber)"
-          />
-        </label>
+        <!-- Minutes and seconds apart (Koen), to start close to the real pace; kept in minutes. -->
+        <fieldset class="duration">
+          <legend>{{ f.label | t }} <span class="muted">({{ f.hint | t }})</span></legend>
+          <div class="duration-inputs">
+            <label>
+              <input
+                #min
+                type="number"
+                min="0"
+                max="180"
+                step="1"
+                inputmode="numeric"
+                [value]="minutesPart(timing()[f.key])"
+                (input)="setDuration(f.key, min.valueAsNumber, sec.valueAsNumber)"
+                [attr.aria-label]="'{phase} minutes' | t: { phase: (f.label | t) }"
+              />
+              <span>{{ 'min' | t }}</span>
+            </label>
+            <label>
+              <input
+                #sec
+                type="number"
+                min="0"
+                max="59"
+                step="1"
+                inputmode="numeric"
+                [value]="secondsPart(timing()[f.key])"
+                (input)="setDuration(f.key, min.valueAsNumber, sec.valueAsNumber)"
+                [attr.aria-label]="'{phase} seconds' | t: { phase: (f.label | t) }"
+              />
+              <span>{{ 'sec' | t }}</span>
+            </label>
+          </div>
+        </fieldset>
       }
     </div>
     <div class="grid3 ovens">
@@ -110,12 +129,19 @@ export class TimingEditor {
     if (value >= 0 && value <= 1000) this.timing.update((t) => ({ ...t, price: Math.round(value * 100) / 100 }));
   }
 
-  protected seconds(minutes: number): number {
-    return Math.round(minutes * 60);
+  protected minutesPart(minutes: number): number {
+    return Math.floor(Math.round(minutes * 60) / 60);
   }
 
-  setSeconds(key: keyof Timing, seconds: number) {
-    if (seconds > 0 && seconds <= 10800) this.timing.update((t) => ({ ...t, [key]: Math.round(seconds) / 60 }));
+  protected secondsPart(minutes: number): number {
+    return Math.round(minutes * 60) % 60;
+  }
+
+  /** Both boxes together; an empty or half-typed box changes nothing yet. */
+  setDuration(key: keyof Timing, minutes: number, seconds: number) {
+    if (!Number.isInteger(minutes) || !Number.isInteger(seconds) || minutes < 0 || seconds < 0 || seconds > 59) return;
+    const total = minutes * 60 + seconds;
+    if (total > 0 && total <= 10800) this.timing.update((t) => ({ ...t, [key]: total / 60 }));
   }
 
   set(key: keyof Timing, value: number, whole = false) {

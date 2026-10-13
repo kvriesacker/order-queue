@@ -811,6 +811,37 @@ input.swatch {
   gap: 0.8rem;
   align-items: end;
 }
+/* A phase time: one box for minutes, one for seconds; as many side by side as fit. */
+.grid3.durations {
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  align-items: start;
+}
+fieldset.duration {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+fieldset.duration legend {
+  padding: 0;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.duration-inputs {
+  display: flex;
+  gap: 0.6rem;
+}
+.duration-inputs label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+}
+.duration-inputs input {
+  width: 3.6rem;
+  padding-inline: 0.45rem;
+}
 .grid3.ovens {
   margin-top: 0.8rem;
 }

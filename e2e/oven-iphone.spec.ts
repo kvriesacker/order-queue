@@ -40,7 +40,8 @@ test('the oven tab in full screen on an iPhone 16 keeps every part of a pizza ro
   test.setTimeout(60_000);
   await page.goto(START);
   await page.getByLabel('Ovens').fill('2');
-  await page.getByLabel(/^Bake/).fill('5');
+  await page.getByLabel('Bake minutes').fill('0');
+  await page.getByLabel('Bake seconds').fill('5');
   await page.getByLabel('Queue password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Start queue' }).click();
   await expect(page).toHaveURL(/#\/q\/\w+$/);
